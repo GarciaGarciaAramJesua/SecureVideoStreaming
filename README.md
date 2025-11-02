@@ -2,8 +2,9 @@
 
 ## Proyecto: Secure Video Streaming
 
-### Fecha: [Tu fecha]
-### Alumno: [Tu nombre]
+### Fecha: 03 de Noviembre de 2025
+### García García Aram Jesua
+### Hernández Díaz Roberto Angel
 
 ---
 
