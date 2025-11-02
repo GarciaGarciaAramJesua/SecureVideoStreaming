@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SecureVideoStreaming.Models", "SecureVideoStreaming.Models\SecureVideoStreaming.Models.csproj", "{73494343-A319-4B7A-850A-84FE1134E5B2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SecureVideoStreaming.API", "SecureVideoStreaming.API\SecureVideoStreaming.API.csproj", "{CC8B76CA-3BAA-48A7-AE1F-77676AD65EC9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SecureVideoStreaming.Data", "SecureVideoStreaming.Data\SecureVideoStreaming.Data.csproj", "{4CF8AAE9-2C03-4D7E-AAC1-D43ED190DA9E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SecureVideoStreaming.Services", "SecureVideoStreaming.Services\SecureVideoStreaming.Services.csproj", "{E46A7BEB-4F14-4CFA-8F93-D237F1A160E1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{73494343-A319-4B7A-850A-84FE1134E5B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73494343-A319-4B7A-850A-84FE1134E5B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73494343-A319-4B7A-850A-84FE1134E5B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73494343-A319-4B7A-850A-84FE1134E5B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC8B76CA-3BAA-48A7-AE1F-77676AD65EC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC8B76CA-3BAA-48A7-AE1F-77676AD65EC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC8B76CA-3BAA-48A7-AE1F-77676AD65EC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC8B76CA-3BAA-48A7-AE1F-77676AD65EC9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4CF8AAE9-2C03-4D7E-AAC1-D43ED190DA9E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4CF8AAE9-2C03-4D7E-AAC1-D43ED190DA9E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4CF8AAE9-2C03-4D7E-AAC1-D43ED190DA9E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4CF8AAE9-2C03-4D7E-AAC1-D43ED190DA9E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E46A7BEB-4F14-4CFA-8F93-D237F1A160E1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E46A7BEB-4F14-4CFA-8F93-D237F1A160E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E46A7BEB-4F14-4CFA-8F93-D237F1A160E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E46A7BEB-4F14-4CFA-8F93-D237F1A160E1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
