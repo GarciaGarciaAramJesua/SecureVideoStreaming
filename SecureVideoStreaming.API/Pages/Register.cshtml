@@ -1,0 +1,86 @@
+@page
+@model SecureVideoStreaming.API.Pages.RegisterModel
+@{
+    ViewData["Title"] = "Registro";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body p-5">
+                    <h2 class="text-center mb-4">
+                        <i class="bi bi-person-plus"></i> Crear Cuenta
+                    </h2>
+                    
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i> @Model.ErrorMessage
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+                    {
+                        <div class="alert alert-success" role="alert">
+                            <i class="bi bi-check-circle"></i> @Model.SuccessMessage
+                        </div>
+                    }
+
+                    <form method="post">
+                        <div class="mb-3">
+                            <label asp-for="Username" class="form-label">Nombre de Usuario</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                <input asp-for="Username" class="form-control" placeholder="usuario123" required />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label">Correo Electrónico</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                <input asp-for="Email" class="form-control" placeholder="correo@ejemplo.com" required />
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label">Contraseña</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                                <input asp-for="Password" type="password" class="form-control" placeholder="Mínimo 8 caracteres" required />
+                            </div>
+                            <small class="form-text text-muted">Mínimo 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="ConfirmPassword" class="form-label">Confirmar Contraseña</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+                                <input asp-for="ConfirmPassword" type="password" class="form-control" placeholder="Repite la contraseña" required />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="UserType" class="form-label">Tipo de Usuario</label>
+                            <select asp-for="UserType" class="form-select">
+                                <option value="Usuario">Usuario (Ver videos)</option>
+                                <option value="Administrador">Administrador (Subir y gestionar videos)</option>
+                            </select>
+                        </div>
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-person-plus"></i> Registrarse
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="text-center mt-4">
+                        <p class="text-muted">¿Ya tienes cuenta? <a asp-page="/Login" class="text-decoration-none">Inicia sesión aquí</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

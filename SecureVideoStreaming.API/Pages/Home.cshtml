@@ -1,0 +1,137 @@
+@page
+@model SecureVideoStreaming.API.Pages.HomeModel
+@{
+    ViewData["Title"] = "Home - Dashboard";
+}
+
+<div class="container mt-4">
+    <!-- Encabezado del Dashboard -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card bg-dark text-white">
+                <div class="card-body">
+                    <h1 class="display-5">
+                        <i class="bi bi-house-door"></i> Dashboard
+                    </h1>
+                    <p class="lead mb-0">
+                        Bienvenido, <strong>@Model.Username</strong> 
+                        <span class="badge bg-primary">@Model.UserType</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botón de subir video (solo para admins) -->
+    @if (Model.IsAdmin)
+    {
+        <div class="row mb-4">
+            <div class="col">
+                <a asp-page="/UploadVideo" class="btn btn-success btn-lg">
+                    <i class="bi bi-cloud-upload"></i> Subir Nuevo Video
+                </a>
+            </div>
+        </div>
+    }
+
+    <!-- Mensajes -->
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> @Model.ErrorMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+    {
+        <div class="alert alert-success" role="alert">
+            <i class="bi bi-check-circle"></i> @Model.SuccessMessage
+        </div>
+    }
+
+    <!-- Grid de Videos -->
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="text-white mb-3">
+                <i class="bi bi-collection-play"></i> Videos Disponibles
+            </h2>
+        </div>
+    </div>
+
+    @if (Model.Videos == null || !Model.Videos.Any())
+    {
+        <div class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-body text-center p-5">
+                        <i class="bi bi-film display-1 text-muted mb-3"></i>
+                        <h3 class="text-muted">No hay videos disponibles</h3>
+                        @if (Model.IsAdmin)
+                        {
+                            <p class="text-muted">Sube tu primer video para comenzar</p>
+                            <a asp-page="/UploadVideo" class="btn btn-primary mt-3">
+                                <i class="bi bi-cloud-upload"></i> Subir Video
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            @foreach (var video in Model.Videos)
+            {
+                <div class="col">
+                    <div class="card video-card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-play-circle"></i> @video.TituloVideo
+                            </h5>
+                            <p class="card-text text-muted">
+                                <small>
+                                    <i class="bi bi-person"></i> @video.NombreAdministrador<br/>
+                                    <i class="bi bi-calendar"></i> @video.FechaSubida.ToString("dd/MM/yyyy HH:mm")<br/>
+                                    <i class="bi bi-hdd"></i> @FormatFileSize(video.TamañoArchivo)
+                                </small>
+                            </p>
+                            <span class="badge bg-info">@video.EstadoProcesamiento</span>
+                        </div>
+                        <div class="card-footer">
+                            @if (Model.IsAdmin)
+                            {
+                                <form method="post" asp-page-handler="DeleteVideo" asp-route-id="@video.IdVideo" class="d-inline">
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de eliminar este video?')">
+                                        <i class="bi bi-trash"></i> Eliminar
+                                    </button>
+                                </form>
+                            }
+                            else
+                            {
+                                <button class="btn btn-primary btn-sm" disabled>
+                                    <i class="bi bi-play-fill"></i> Ver Video
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@functions {
+    string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

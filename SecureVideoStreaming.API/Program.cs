@@ -1,14 +1,49 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using SecureVideoStreaming.Data.Context;
 using SecureVideoStreaming.API.Extensions;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddControllers();
+builder.Services.AddRazorPages();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Session support for Razor Pages
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// JWT Authentication
+var jwtSettings = builder.Configuration.GetSection("Jwt");
+var secretKey = jwtSettings["SecretKey"];
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey!))
+    };
+});
 
 // Database Configuration - SQL Server
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -26,6 +61,11 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Cryptography Services
 builder.Services.AddCryptographyServices();
+
+// Business Services
+builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IAuthService, SecureVideoStreaming.Services.Business.Implementations.AuthService>();
+builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IUserService, SecureVideoStreaming.Services.Business.Implementations.UserService>();
+builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IVideoService, SecureVideoStreaming.Services.Business.Implementations.VideoService>();
 
 // CORS Configuration
 builder.Services.AddCors(options =>
@@ -48,9 +88,14 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
 app.UseCors("AllowAll");
+app.UseSession();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapRazorPages();
 
 app.Run();
 

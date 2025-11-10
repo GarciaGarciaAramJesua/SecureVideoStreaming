@@ -4,19 +4,26 @@ namespace SecureVideoStreaming.Models.Entities
 {
     public class Permission
     {
-        public Guid Id { get; set; }
+        public int IdPermiso { get; set; }
+        public int IdVideo { get; set; }
+        public int IdUsuario { get; set; }
+        public string TipoPermiso { get; set; } = "Lectura"; // 'Lectura', 'Temporal', 'Revocado'
+        
+        // Metadata
+        public DateTime FechaOtorgamiento { get; set; } = DateTime.UtcNow;
+        public DateTime? FechaExpiracion { get; set; }
+        public DateTime? FechaRevocacion { get; set; }
+        public int NumeroAccesos { get; set; } = 0;
+        public DateTime? UltimoAcceso { get; set; }
+        
+        // Otorgamiento y Revocación
+        public int OtorgadoPor { get; set; }
+        public int? RevocadoPor { get; set; }
         
         // Relaciones
-        public Guid VideoId { get; set; }
         public Video Video { get; set; } = null!;
-        
-        public Guid ConsumerId { get; set; }
-        public User Consumer { get; set; } = null!;
-        
-        // Control de acceso
-        public DateTime GrantedAt { get; set; }
-        public DateTime? ExpiresAt { get; set; }
-        public bool IsRevoked { get; set; }
-        public DateTime? RevokedAt { get; set; }
+        public User Usuario { get; set; } = null!;
+        public User UsuarioOtorgante { get; set; } = null!;
+        public User? UsuarioRevocador { get; set; }
     }
 }

@@ -1,0 +1,85 @@
+@page
+@model SecureVideoStreaming.API.Pages.UploadVideoModel
+@{
+    ViewData["Title"] = "Subir Video";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body p-5">
+                    <h2 class="mb-4">
+                        <i class="bi bi-cloud-upload"></i> Subir Nuevo Video
+                    </h2>
+
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i> @Model.ErrorMessage
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+                    {
+                        <div class="alert alert-success" role="alert">
+                            <i class="bi bi-check-circle"></i> @Model.SuccessMessage
+                        </div>
+                    }
+
+                    <form method="post" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <label asp-for="VideoFile" class="form-label">
+                                <i class="bi bi-file-earmark-play"></i> Seleccionar Video
+                            </label>
+                            <input asp-for="VideoFile" type="file" class="form-control" accept="video/*" required />
+                            <small class="form-text text-muted">
+                                Formatos aceptados: MP4, AVI, MKV, MOV (Máximo 500 MB)
+                            </small>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="Description" class="form-label">
+                                <i class="bi bi-card-text"></i> Descripción (Opcional)
+                            </label>
+                            <textarea asp-for="Description" class="form-control" rows="3" placeholder="Describe el contenido del video..."></textarea>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> 
+                            <strong>Nota:</strong> El video será cifrado automáticamente con ChaCha20-Poly1305 antes de almacenarse.
+                        </div>
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-success btn-lg" id="uploadBtn">
+                                <i class="bi bi-cloud-upload"></i> Subir Video
+                            </button>
+                            <a asp-page="/Home" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+
+                    <div id="uploadProgress" class="mt-4" style="display: none;">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" 
+                                 style="width: 100%">
+                                Subiendo y cifrando video...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelector('form').addEventListener('submit', function() {
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('uploadProgress').style.display = 'block';
+        });
+    </script>
+}

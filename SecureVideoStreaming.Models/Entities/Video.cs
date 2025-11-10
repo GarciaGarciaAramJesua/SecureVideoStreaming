@@ -5,27 +5,26 @@ namespace SecureVideoStreaming.Models.Entities
 {
     public class Video
     {
-        public Guid Id { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public long FileSizeBytes { get; set; }
-        public int DurationSeconds { get; set; }
-        
-        // Criptografía
-        public string EncryptedFilePath { get; set; } = string.Empty;
-        public string EncryptedKek { get; set; } = string.Empty; // KEK cifrada con RSA del servidor
-        public string Nonce { get; set; } = string.Empty; // Nonce de 12 bytes para ChaCha20-Poly1305
-        public string AuthTag { get; set; } = string.Empty; // Tag de autenticación de Poly1305
-        public string Hmac { get; set; } = string.Empty; // HMAC del owner
-        public string OriginalHash { get; set; } = string.Empty; // SHA-256 del video original
+        public int IdVideo { get; set; }
+        public int IdAdministrador { get; set; }
+        public string TituloVideo { get; set; } = string.Empty;
+        public string? Descripcion { get; set; }
+        public string NombreArchivoOriginal { get; set; } = string.Empty;
+        public string NombreArchivoCifrado { get; set; } = string.Empty;
+        public long TamañoArchivo { get; set; }
+        public int? Duracion { get; set; }
+        public string? FormatoVideo { get; set; }
+        public string RutaAlmacenamiento { get; set; } = string.Empty;
+        public string EstadoProcesamiento { get; set; } = "Procesando"; // 'Procesando', 'Disponible', 'Error', 'Eliminado'
         
         // Metadata
-        public DateTime UploadedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
+        public DateTime FechaSubida { get; set; } = DateTime.UtcNow;
+        public DateTime? FechaModificacion { get; set; }
         
         // Relaciones
-        public Guid OwnerId { get; set; }
-        public User Owner { get; set; } = null!;
-        public ICollection<Permission> Permissions { get; set; } = new List<Permission>();
+        public User Administrador { get; set; } = null!;
+        public CryptoData? DatosCriptograficos { get; set; }
+        public ICollection<Permission> Permisos { get; set; } = new List<Permission>();
+        public ICollection<AccessLog> RegistrosAccesos { get; set; } = new List<AccessLog>();
     }
 }

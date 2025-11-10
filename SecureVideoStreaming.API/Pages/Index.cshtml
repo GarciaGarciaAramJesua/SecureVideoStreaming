@@ -1,0 +1,28 @@
+@page
+@model SecureVideoStreaming.API.Pages.IndexModel
+@{
+    ViewData["Title"] = "Inicio";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <div class="card bg-dark text-white">
+                <div class="card-body p-5">
+                    <i class="bi bi-shield-check display-1 mb-4"></i>
+                    <h1 class="display-4 mb-4">SecureVideoStreaming</h1>
+                    <p class="lead mb-4">Sistema seguro de transmisión de videos con cifrado ChaCha20-Poly1305</p>
+                    
+                    <div class="d-grid gap-3 d-md-flex justify-content-md-center">
+                        <a asp-page="/Login" class="btn btn-primary btn-lg px-5">
+                            <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
+                        </a>
+                        <a asp-page="/Register" class="btn btn-outline-light btn-lg px-5">
+                            <i class="bi bi-person-plus"></i> Registrarse
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
