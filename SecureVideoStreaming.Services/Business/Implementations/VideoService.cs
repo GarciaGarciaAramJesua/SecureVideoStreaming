@@ -13,26 +13,20 @@ namespace SecureVideoStreaming.Services.Business.Implementations
     public class VideoService : IVideoService
     {
         private readonly ApplicationDbContext _context;
-        private readonly IChaCha20Poly1305Service _chaCha20Service;
-        private readonly IRsaService _rsaService;
-        private readonly IHashService _hashService;
-        private readonly IHmacService _hmacService;
+        private readonly IVideoEncryptionService _videoEncryptionService;
+        private readonly IKeyManagementService _keyManagementService;
         private readonly IConfiguration _configuration;
         private readonly string _videosPath;
 
         public VideoService(
             ApplicationDbContext context,
-            IChaCha20Poly1305Service chaCha20Service,
-            IRsaService rsaService,
-            IHashService hashService,
-            IHmacService hmacService,
+            IVideoEncryptionService videoEncryptionService,
+            IKeyManagementService keyManagementService,
             IConfiguration configuration)
         {
             _context = context;
-            _chaCha20Service = chaCha20Service;
-            _rsaService = rsaService;
-            _hashService = hashService;
-            _hmacService = hmacService;
+            _videoEncryptionService = videoEncryptionService;
+            _keyManagementService = keyManagementService;
             _configuration = configuration;
             _videosPath = configuration["Storage:VideosPath"] ?? "./Storage/Videos";
 
@@ -54,21 +48,7 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                     return ApiResponse<VideoResponse>.ErrorResponse("Solo los administradores pueden subir videos");
                 }
 
-                // 2. Leer video en memoria
-                using var memoryStream = new MemoryStream();
-                await videoStream.CopyToAsync(memoryStream);
-                var videoBytes = memoryStream.ToArray();
-
-                // 3. Calcular hash del video original
-                var hashOriginal = _hashService.ComputeSha256(videoBytes);
-
-                // 4. Generar KEK (Key Encryption Key)
-                var kek = _chaCha20Service.GenerateKey();
-
-                // 5. Cifrar video con ChaCha20-Poly1305
-                var (ciphertext, nonce, authTag) = _chaCha20Service.Encrypt(videoBytes, kek);
-
-                // 6. Obtener clave HMAC del administrador
+                // 2. Obtener clave HMAC del administrador
                 var userKeys = await _context.ClavesUsuarios
                     .FirstOrDefaultAsync(k => k.IdUsuario == request.IdAdministrador);
 
@@ -77,19 +57,34 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                     return ApiResponse<VideoResponse>.ErrorResponse("El administrador no tiene clave HMAC configurada");
                 }
 
-                // 7. Calcular HMAC del video cifrado
-                var hmac = _hmacService.ComputeHmac(ciphertext, userKeys.ClaveHMAC);
+                // 3. Obtener clave pública del servidor
+                var serverPublicKey = _keyManagementService.GetServerPublicKey();
 
-                // 8. Cifrar KEK con clave pública del servidor (simulado - en producción usar clave real)
-                var (serverPublicKey, _) = _rsaService.GenerateKeyPair(2048);
-                var encryptedKek = _rsaService.Encrypt(kek, serverPublicKey);
+                // 4. Guardar video original temporalmente
+                var tempOriginalPath = Path.Combine(_videosPath, $"temp_{Guid.NewGuid()}.tmp");
+                await using (var fileStream = new FileStream(tempOriginalPath, FileMode.Create, FileAccess.Write))
+                {
+                    await videoStream.CopyToAsync(fileStream);
+                }
 
-                // 9. Guardar video cifrado en disco
+                // 5. Cifrar video usando VideoEncryptionService
                 var nombreArchivoCifrado = $"{Guid.NewGuid()}.encrypted";
                 var rutaAlmacenamiento = Path.Combine(_videosPath, nombreArchivoCifrado);
-                await File.WriteAllBytesAsync(rutaAlmacenamiento, ciphertext);
 
-                // 10. Crear registro de video
+                var encryptionResult = await _videoEncryptionService.EncryptVideoAsync(
+                    tempOriginalPath,
+                    rutaAlmacenamiento,
+                    userKeys.ClaveHMAC,
+                    serverPublicKey
+                );
+
+                // 6. Eliminar archivo temporal
+                if (File.Exists(tempOriginalPath))
+                {
+                    File.Delete(tempOriginalPath);
+                }
+
+                // 7. Crear registro de video
                 var video = new Video
                 {
                     IdAdministrador = request.IdAdministrador,
@@ -97,7 +92,7 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                     Descripcion = request.Descripcion,
                     NombreArchivoOriginal = request.NombreArchivo,
                     NombreArchivoCifrado = nombreArchivoCifrado,
-                    TamañoArchivo = ciphertext.Length,
+                    TamañoArchivo = encryptionResult.EncryptedSizeBytes,
                     RutaAlmacenamiento = rutaAlmacenamiento,
                     EstadoProcesamiento = "Disponible",
                     FechaSubida = DateTime.UtcNow
@@ -106,16 +101,16 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                 _context.Videos.Add(video);
                 await _context.SaveChangesAsync();
 
-                // 11. Crear registro de datos criptográficos
+                // 8. Crear registro de datos criptográficos
                 var cryptoData = new CryptoData
                 {
                     IdVideo = video.IdVideo,
-                    KEKCifrada = encryptedKek,
-                    AlgoritmoKEK = "ChaCha20-Poly1305",
-                    Nonce = nonce,
-                    AuthTag = authTag,
-                    HashSHA256Original = hashOriginal,
-                    HMACDelVideo = hmac,
+                    KEKCifrada = encryptionResult.EncryptedKek,
+                    AlgoritmoKEK = "RSA-OAEP",
+                    Nonce = encryptionResult.Nonce,
+                    AuthTag = encryptionResult.AuthTag,
+                    HashSHA256Original = encryptionResult.OriginalHash,
+                    HMACDelVideo = encryptionResult.HmacOfEncryptedVideo,
                     FechaGeneracionClaves = DateTime.UtcNow,
                     VersionAlgoritmo = "1.0"
                 };
@@ -276,6 +271,125 @@ namespace SecureVideoStreaming.Services.Business.Implementations
             catch (Exception ex)
             {
                 return ApiResponse<bool>.ErrorResponse($"Error al eliminar video: {ex.Message}");
+            }
+        }
+
+        public async Task<ApiResponse<VideoIntegrityResponse>> VerifyVideoIntegrityAsync(int videoId, int adminId)
+        {
+            try
+            {
+                var video = await _context.Videos.FindAsync(videoId);
+                if (video == null)
+                {
+                    return ApiResponse<VideoIntegrityResponse>.ErrorResponse("Video no encontrado");
+                }
+
+                // Verificar que el administrador es el dueño del video
+                if (video.IdAdministrador != adminId)
+                {
+                    return ApiResponse<VideoIntegrityResponse>.ErrorResponse("Solo el administrador dueño puede verificar la integridad");
+                }
+
+                // Obtener datos criptográficos
+                var cryptoData = await _context.DatosCriptograficosVideos
+                    .FirstOrDefaultAsync(c => c.IdVideo == videoId);
+
+                if (cryptoData == null)
+                {
+                    return ApiResponse<VideoIntegrityResponse>.ErrorResponse("No se encontraron datos criptográficos para este video");
+                }
+
+                // Obtener clave HMAC del administrador
+                var userKeys = await _context.ClavesUsuarios
+                    .FirstOrDefaultAsync(k => k.IdUsuario == adminId);
+
+                if (userKeys?.ClaveHMAC == null)
+                {
+                    return ApiResponse<VideoIntegrityResponse>.ErrorResponse("No se encontró la clave HMAC del administrador");
+                }
+
+                // Verificar integridad del video
+                var isValid = _videoEncryptionService.VerifyVideoIntegrity(
+                    video.RutaAlmacenamiento,
+                    cryptoData.HMACDelVideo,
+                    userKeys.ClaveHMAC
+                );
+
+                var response = new VideoIntegrityResponse
+                {
+                    IdVideo = videoId,
+                    TituloVideo = video.TituloVideo,
+                    IsValid = isValid,
+                    HashSHA256Original = Convert.ToBase64String(cryptoData.HashSHA256Original),
+                    FechaVerificacion = DateTime.UtcNow,
+                    Message = isValid 
+                        ? "La integridad del video es válida" 
+                        : "ALERTA: La integridad del video ha sido comprometida"
+                };
+
+                return ApiResponse<VideoIntegrityResponse>.SuccessResponse(
+                    response, 
+                    isValid ? "Verificación exitosa" : "Verificación fallida"
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<VideoIntegrityResponse>.ErrorResponse($"Error al verificar integridad: {ex.Message}");
+            }
+        }
+
+        public async Task<ApiResponse<VideoResponse>> UpdateVideoMetadataAsync(int videoId, UpdateVideoMetadataRequest request, int adminId)
+        {
+            try
+            {
+                var video = await _context.Videos
+                    .Include(v => v.Administrador)
+                    .FirstOrDefaultAsync(v => v.IdVideo == videoId);
+
+                if (video == null)
+                {
+                    return ApiResponse<VideoResponse>.ErrorResponse("Video no encontrado");
+                }
+
+                // Verificar que el administrador es el dueño del video
+                if (video.IdAdministrador != adminId)
+                {
+                    return ApiResponse<VideoResponse>.ErrorResponse("Solo el administrador dueño puede actualizar el video");
+                }
+
+                // Actualizar metadata
+                if (!string.IsNullOrWhiteSpace(request.TituloVideo))
+                {
+                    video.TituloVideo = request.TituloVideo;
+                }
+
+                if (!string.IsNullOrWhiteSpace(request.Descripcion))
+                {
+                    video.Descripcion = request.Descripcion;
+                }
+
+                video.FechaModificacion = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                var response = new VideoResponse
+                {
+                    IdVideo = video.IdVideo,
+                    TituloVideo = video.TituloVideo,
+                    Descripcion = video.Descripcion,
+                    NombreArchivoOriginal = video.NombreArchivoOriginal,
+                    TamañoArchivo = video.TamañoArchivo,
+                    EstadoProcesamiento = video.EstadoProcesamiento,
+                    FechaSubida = video.FechaSubida,
+                    IdAdministrador = video.IdAdministrador,
+                    NombreAdministrador = video.Administrador.NombreUsuario,
+                    Message = "Metadata actualizada exitosamente"
+                };
+
+                return ApiResponse<VideoResponse>.SuccessResponse(response, "Metadata actualizada exitosamente");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<VideoResponse>.ErrorResponse($"Error al actualizar metadata: {ex.Message}");
             }
         }
     }

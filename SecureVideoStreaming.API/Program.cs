@@ -63,8 +63,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddCryptographyServices();
 
 // Business Services
-builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IAuthService, SecureVideoStreaming.Services.Business.Implementations.AuthService>();
-builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IUserService, SecureVideoStreaming.Services.Business.Implementations.UserService>();
+builder.Services.AddBusinessServices();
 builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IVideoService, SecureVideoStreaming.Services.Business.Implementations.VideoService>();
 
 // CORS Configuration
