@@ -32,6 +32,11 @@ namespace SecureVideoStreaming.API.Extensions
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IVideoService, VideoService>();
+            
+            // Servicios de distribución de claves y permisos
+            services.AddScoped<IPermissionService, PermissionService>();
+            services.AddScoped<IKeyDistributionService, KeyDistributionService>();
+            services.AddScoped<IVideoStreamingService, VideoStreamingService>();
 
             return services;
         }

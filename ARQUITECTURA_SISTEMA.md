@@ -19,8 +19,20 @@
 │  │                  │  │                  │  │ DELETE /{id}     │           │
 │  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘           │
 │           │                     │                     │                     │
-│           └─────────────────────┴─────────────────────┘                     │
-│                                 │                                           │
+│           │                     │                     │                     │
+│  ┌────────▼───────────┐  ┌──────▼─────────────────┐  ┌─▼───────────────┐    │
+│  │ KeyDistribution    │  │ StreamingController    │  │                 │    │
+│  │ Controller         │  ├────────────────────────┤  │                 │    │
+│  ├────────────────────┤  │ GET /video/{id}        │  │                 │    │
+│  │ POST /request-access│ │ (Range support)        │  │                 │    │
+│  │ GET /my-permissions│  │                        │  │                 │    │
+│  │ POST /get-key      │  │                        │  │                 │    │
+│  │ POST /approve      │  │                        │  │                 │    │
+│  │ DELETE /revoke     │  │                        │  │                 │    │
+│  └────────┬───────────┘  └────────┬───────────────┘  └─────────────────┘    │
+│           │                       │                                         │
+│           └───────────────────────┴─────────────────────────────────────────┘
+│                                   │                                         │
 │                    ┌────────────▼────────────┐                              │
 │                    │  Middleware Pipeline    │                              │
 │                    ├─────────────────────────┤                              │
@@ -950,6 +962,456 @@ GET    /api/videos/admin/{adminId}
 
 ---
 
+## Módulo de Distribución de Claves y Streaming
+
+### Diagrama de Flujo: Solicitud y Distribución de Claves
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                  FLUJO DE DISTRIBUCIÓN DE CLAVES                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   CONSUMIDOR                     SERVIDOR                      BASE DE DATOS
+       │                              │                                │
+       │ 1. POST /request-access      │                                │
+       │  { videoId, justificacion }  │                                │
+       ├─────────────────────────────►│                                │
+       │                              │  Validar video existe          │
+       │                              │  Validar no es dueño           │
+       │                              │  Crear Permiso "Pendiente"     │
+       │                              ├───────────────────────────────►│
+       │                              │                                │
+       │◄─────────────────────────────┤                                │
+       │  { success, permisoId }      │                                │
+       │                              │                                │
+       ▼                              ▼                                ▼
+    Espera aprobación del administrador...
+       │                              │                                │
+       │                              │  2. Admin recibe notificación  │
+       │                              │     GET /video/{id}/permissions│
+       │                              │                                │
+       │                              │  3. Admin aprueba solicitud    │
+       │                              │  POST /approve/{permisoId}     │
+       │                              │  { maxAccesos?, fechaExpiracion? }
+       │                              │                                │
+       │                              │  Actualizar Permiso a "Aprobado"
+       │                              ├───────────────────────────────►│
+       │                              │                                │
+       │ 4. POST /get-key-package     │                                │
+       │  { videoId, userPublicKey }  │                                │
+       ├─────────────────────────────►│                                │
+       │                              │                                │
+       │                              │  Validar permiso activo        │
+       │                              ├───────────────────────────────►│
+       │                              │◄───────────────────────────────┤
+       │                              │  { Permiso aprobado }          │
+       │                              │                                │
+       │                              │  Obtener KEK cifrada del video │
+       │                              ├───────────────────────────────►│
+       │                              │◄───────────────────────────────┤
+       │                              │  { KEKCifrada, Nonce, AuthTag }│
+       │                              │                                │
+       │                     ┌────────▼────────┐                       │
+       │                     │ 5. Descifrar KEK│                       │
+       │                     │ con clave privada│                      │
+       │                     │   del servidor   │                      │
+       │                     └────────┬─────────┘                      │
+       │                              │                                │
+       │                     ┌────────▼────────┐                       │
+       │                     │ 6. Re-cifrar KEK│                       │
+       │                     │  con clave pública│                     │
+       │                     │  del consumidor  │                      │
+       │                     └────────┬─────────┘                      │
+       │                              │                                │
+       │                              │  Incrementar contador accesos  │
+       │                              ├───────────────────────────────►│
+       │                              │                                │
+       │                              │  Registrar acceso exitoso      │
+       │                              ├───────────────────────────────►│
+       │                              │                                │
+       │◄─────────────────────────────┤                                │
+       │ 7. KeyPackageResponse        │                                │
+       │  {                           │                                │
+       │    encryptedKekForUser,      │                                │
+       │    nonce,                    │                                │
+       │    authTag,                  │                                │
+       │    streamingToken            │                                │
+       │  }                           │                                │
+       │                              │                                │
+       │ 8. Consumidor descifra KEK   │                                │
+       │    con su clave privada      │                                │
+       └──────────────────────────────┴────────────────────────────────┘
+
+```
+
+### Diagrama de Flujo: Streaming de Video Cifrado
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      FLUJO DE STREAMING CHUNKED                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   CONSUMIDOR                     SERVIDOR                      STORAGE
+       │                              │                            │
+       │ 1. GET /streaming/video/{id} │                            │
+       │    Header: Range: bytes=0-   │                            │
+       ├─────────────────────────────►│                            │
+       │                              │                            │
+       │                              │  Validar permiso activo    │
+       │                              │  (HasAccessAsync)          │
+       │                              │                            │
+       │                              │  Obtener ruta del video    │
+       │                              │  Storage/Videos/{id}.encrypted
+       │                              ├───────────────────────────►│
+       │                              │                            │
+       │                              │  Parsear Range header      │
+       │                              │  rangeStart = 0            │
+       │                              │  rangeEnd = null (EOF)     │
+       │                              │                            │
+       │                              │  Abrir FileStream          │
+       │                              │  Seek(rangeStart)          │
+       │                              │◄───────────────────────────┤
+       │                              │  Stream chunk              │
+       │                              │                            │
+       │◄─────────────────────────────┤                            │
+       │ HTTP 206 Partial Content     │                            │
+       │ Headers:                     │                            │
+       │   Accept-Ranges: bytes       │                            │
+       │   Content-Range: 0-1048575/10485760                       │
+       │   Content-Length: 1048576    │                            │
+       │ Body: [chunk de video cifrado]                            │
+       │                              │                            │
+       │ 2. Descifrar chunk localmente│                            │
+       │    con KEK + nonce + authTag │                            │
+       │                              │                            │
+       │ 3. GET /streaming/video/{id} │                            │
+       │    Range: bytes=1048576-     │                            │
+       ├─────────────────────────────►│                            │
+       │                              │  Seek(1048576)             │
+       │                              │  Read next chunk           │
+       │◄─────────────────────────────┤                            │
+       │ HTTP 206 Partial Content     │                            │
+       │ Content-Range: 1048576-2097151/10485760                   │
+       │                              │                            │
+       │ ... continúa hasta EOF       │                            │
+       │                              │                            │
+       └──────────────────────────────┴────────────────────────────┘
+
+```
+
+### Nuevos Endpoints - Distribución de Claves
+
+```
+POST   /api/key-distribution/request-access
+       Auth: Authenticated (Usuario)
+       Body: { videoId, justificacion }
+       Response: { success, data: PermissionResponse }
+
+GET    /api/key-distribution/my-permissions
+       Auth: Authenticated
+       Response: { success, data: [PermissionResponse] }
+
+POST   /api/key-distribution/get-key-package
+       Auth: Authenticated
+       Body: { videoId, userPublicKey }
+       Response: { 
+         success, 
+         data: {
+           encryptedKekForUser: "base64...",
+           nonce: "base64...",
+           authTag: "base64...",
+           algorithm: "ChaCha20-Poly1305",
+           videoId: 123,
+           streamingToken: "token...",
+           generatedAt: "2025-11-23T10:00:00Z",
+           expiresAt: "2025-11-23T11:00:00Z"
+         }
+       }
+
+POST   /api/key-distribution/approve/{permisoId}
+       Auth: Administrador (owner only)
+       Body: { maxAccesos?, fechaExpiracion? }
+       Response: { success, data: PermissionResponse }
+
+DELETE /api/key-distribution/revoke/{permisoId}
+       Auth: Administrador (owner only)
+       Response: { success, data: true }
+
+GET    /api/key-distribution/video/{videoId}/permissions
+       Auth: Administrador (owner only)
+       Response: { success, data: [PermissionResponse] }
+```
+
+### Nuevos Endpoints - Streaming
+
+```
+GET    /api/streaming/video/{videoId}
+       Auth: Authenticated (con permiso aprobado)
+       Headers: Range: bytes=start-end (opcional)
+       Response: 
+         - HTTP 200 OK (sin Range header)
+           Body: video completo cifrado
+         - HTTP 206 Partial Content (con Range header)
+           Headers:
+             Accept-Ranges: bytes
+             Content-Range: bytes start-end/total
+             Content-Length: chunk_size
+           Body: chunk de video cifrado
+         - HTTP 403 Forbidden (sin permiso)
+         - HTTP 416 Range Not Satisfiable (rango inválido)
+```
+
+### Componentes Principales del Módulo
+
+#### 1. PermissionService
+**Responsabilidades:**
+- Gestionar solicitudes de acceso a videos
+- Aprobar/revocar permisos (solo administrador dueño)
+- Validar permisos activos (no expirados, no revocados, accesos disponibles)
+- Registrar intentos de acceso en tabla de auditoría
+- Incrementar contador de accesos
+
+**Métodos Clave:**
+- `RequestAccessAsync(videoId, userId, justificacion)` - Crear solicitud pendiente
+- `HasAccessAsync(videoId, userId)` - Validar permiso activo
+- `ApproveAccessAsync(permisoId, adminId, maxAccesos?, fechaExpiracion?)` - Aprobar solicitud
+- `RevokeAccessAsync(permisoId, adminId)` - Revocar acceso
+- `GetVideoPermissionsAsync(videoId, adminId)` - Listar permisos de un video
+- `GetMyPermissionsAsync(userId)` - Listar mis permisos
+- `RegisterAccessAsync(videoId, userId, exitoso, mensajeError?)` - Auditoría
+- `IncrementAccessCountAsync(permisoId)` - Contador de usos
+
+#### 2. KeyDistributionService
+**Responsabilidades:**
+- Distribuir claves de cifrado de forma segura
+- Re-cifrar KEK con clave pública del consumidor
+- Generar y validar tokens de streaming
+- Garantizar que solo usuarios autorizados obtengan claves
+
+**Métodos Clave:**
+- `GetKeyPackageAsync(videoId, userId, userPublicKey)` - Paquete de claves personalizado
+  1. Valida permiso activo
+  2. Obtiene KEK cifrada del video (cifrada con clave pública del servidor)
+  3. Descifra KEK usando clave privada del servidor
+  4. Re-cifra KEK con clave pública del consumidor (RSA-OAEP)
+  5. Retorna paquete: KEK re-cifrada + nonce + authTag + token
+  6. Incrementa contador de accesos
+  7. Registra acceso exitoso
+  
+- `GenerateStreamingTokenAsync(videoId, userId)` - Token temporal con HMAC
+- `ValidateStreamingTokenAsync(token, videoId, userId)` - Verificar token
+
+**Flujo de Re-cifrado de KEK:**
+```
+Video Upload:
+  KEK_plaintext (32 bytes) → RSA-Encrypt(server_public_key) → KEK_encrypted_server (512 bytes)
+  ↓
+  Guardado en DB: DatosCriptograficosVideos.KEKCifrada
+
+Key Distribution:
+  1. Obtener: KEK_encrypted_server (512 bytes) [DB]
+  2. Descifrar: RSA-Decrypt(server_private_key) → KEK_plaintext (32 bytes)
+  3. Re-cifrar: RSA-Encrypt(consumer_public_key) → KEK_encrypted_consumer (512 bytes)
+  4. Enviar: KeyPackageResponse { encryptedKekForUser, nonce, authTag }
+
+Consumer Decryption:
+  KEK_encrypted_consumer → RSA-Decrypt(consumer_private_key) → KEK_plaintext
+  ↓
+  ChaCha20-Poly1305-Decrypt(video, KEK_plaintext, nonce, authTag) → video_plaintext
+```
+
+#### 3. VideoStreamingService
+**Responsabilidades:**
+- Streaming de videos cifrados en chunks
+- Soporte para HTTP Range requests
+- Manejo eficiente de memoria con streams
+
+**Métodos Clave:**
+- `GetVideoChunkAsync(videoPath, rangeStart, rangeEnd?)` - Stream de chunk específico
+  - Clase auxiliar `LimitedStream` para limitar bytes leídos
+  - FileStream.Seek() para posicionar en byte específico
+  - Retorna tupla: (Stream, totalSize, start, end)
+  
+- `GetVideoInfoAsync(videoPath)` - Tamaño y content-type
+- `ValidateVideoFileAsync(videoPath)` - Existencia y permisos
+
+**Soporte Range Requests:**
+```
+Request Headers:
+  Range: bytes=0-1023        → Lee bytes 0 a 1023 (1024 bytes)
+  Range: bytes=1024-         → Lee desde byte 1024 hasta EOF
+  Range: bytes=-500          → Lee últimos 500 bytes (no soportado actualmente)
+
+Response Headers (206 Partial Content):
+  Accept-Ranges: bytes
+  Content-Range: bytes 0-1023/10485760
+  Content-Length: 1024
+  
+Response Codes:
+  200 OK                     → Archivo completo
+  206 Partial Content        → Chunk específico
+  416 Range Not Satisfiable  → Rango inválido
+```
+
+### Seguridad del Módulo
+
+**Capas de Protección:**
+
+1. **Autenticación JWT**: Solo usuarios autenticados pueden solicitar acceso
+2. **Autorización basada en Permisos**: Solo usuarios con permiso aprobado obtienen claves
+3. **Re-cifrado Asimétrico**: Cada consumidor obtiene KEK cifrada únicamente para él
+4. **Tokens de Streaming**: HMAC-SHA256 con expiración de 1 hora
+5. **Límites de Acceso**: MaxAccesos configurable por permiso
+6. **Expiración de Permisos**: FechaExpiracion configurable
+7. **Auditoría Completa**: Tabla RegistroAccesos registra todos los intentos
+8. **Revocación Inmediata**: Administrador puede revocar acceso en cualquier momento
+
+**Prevención de Ataques:**
+- **Man-in-the-Middle**: KEK siempre cifrada en tránsito (HTTPS + RSA)
+- **Replay Attacks**: Tokens con expiración y HMAC
+- **Privilege Escalation**: Validación de roles en cada endpoint
+- **Data Leakage**: Videos nunca se descifran en servidor
+- **Brute Force**: Límite de accesos por permiso
+
+### Modelo de Datos - Nuevas Tablas
+
+#### Tabla: Permisos
+```sql
+IdPermiso (PK)
+IdVideo (FK → Videos)
+IdUsuario (FK → Usuarios)
+TipoPermiso (VARCHAR): 'Pendiente', 'Aprobado', 'Revocado'
+FechaOtorgamiento (DATETIME)
+FechaExpiracion (DATETIME, nullable)
+FechaRevocacion (DATETIME, nullable)
+NumeroAccesos (INT, default 0)
+MaxAccesos (INT, nullable) -- NULL = ilimitado
+UltimoAcceso (DATETIME, nullable)
+OtorgadoPor (FK → Usuarios)
+RevocadoPor (FK → Usuarios, nullable)
+```
+
+#### Tabla: RegistroAccesos (AccessLog)
+```sql
+IdRegistro (PK, BIGINT)
+IdUsuario (FK → Usuarios)
+IdVideo (FK → Videos)
+TipoAcceso (VARCHAR): 'Visualizacion', 'Descarga', 'SolicitudClave', 'Verificacion'
+Exitoso (BIT)
+MensajeError (VARCHAR, nullable)
+DireccionIP (VARCHAR, nullable)
+UserAgent (VARCHAR, nullable)
+FechaHoraAcceso (DATETIME)
+DuracionAcceso (INT, nullable) -- segundos
+```
+
+### DTOs del Módulo
+
+#### PermissionResponse
+```csharp
+{
+  idPermiso: int,
+  idVideo: int,
+  tituloVideo: string,
+  idUsuario: int,
+  nombreUsuario: string,
+  tipoPermiso: "Pendiente" | "Aprobado" | "Revocado",
+  fechaOtorgamiento: DateTime,
+  fechaExpiracion: DateTime?,
+  fechaRevocacion: DateTime?,
+  numeroAccesos: int,
+  accesosRestantes: int?,
+  estaActivo: bool,
+  estaExpirado: bool,
+  mensajeEstado: string
+}
+```
+
+#### KeyPackageResponse
+```csharp
+{
+  encryptedKekForUser: string,  // Base64, 512 bytes RSA-encrypted
+  nonce: string,                // Base64, 12 bytes
+  authTag: string,              // Base64, 16 bytes
+  algorithm: "ChaCha20-Poly1305",
+  videoId: int,
+  streamingToken: string,
+  generatedAt: DateTime,
+  expiresAt: DateTime           // 1 hora por defecto
+}
+```
+
+#### StreamingTokenResponse
+```csharp
+{
+  token: string,                // HMAC-SHA256 firmado
+  videoId: int,
+  streamingUrl: string,         // "/api/streaming/video/{id}"
+  expiresAt: DateTime,
+  fileSizeBytes: long,
+  contentType: "application/octet-stream"
+}
+```
+
+### Ejemplo de Uso Completo
+
+```bash
+# 1. Usuario solicita acceso a video
+POST /api/key-distribution/request-access
+Authorization: Bearer {jwt_token}
+{
+  "videoId": 123,
+  "justificacion": "Necesito el video para mi proyecto de investigación"
+}
+
+# 2. Administrador aprueba solicitud
+POST /api/key-distribution/approve/456
+Authorization: Bearer {admin_jwt_token}
+{
+  "maxAccesos": 10,
+  "fechaExpiracion": "2025-12-31T23:59:59Z"
+}
+
+# 3. Usuario obtiene paquete de claves
+POST /api/key-distribution/get-key-package
+Authorization: Bearer {jwt_token}
+{
+  "videoId": 123,
+  "userPublicKey": "-----BEGIN PUBLIC KEY-----\nMIICIjANBg..."
+}
+
+# Respuesta:
+{
+  "success": true,
+  "data": {
+    "encryptedKekForUser": "ZXhhbXBsZV9lbmNyeXB0ZWRfa2V5...",
+    "nonce": "cmFuZG9tX25vbmNl",
+    "authTag": "YXV0aF90YWdf",
+    "algorithm": "ChaCha20-Poly1305",
+    "videoId": 123,
+    "streamingToken": "eyJ2aWRlb0lkIjoxMjMsInVzZXJJZCI6...",
+    "generatedAt": "2025-11-23T10:00:00Z",
+    "expiresAt": "2025-11-23T11:00:00Z"
+  }
+}
+
+# 4. Usuario descarga video en chunks
+GET /api/streaming/video/123
+Authorization: Bearer {jwt_token}
+Range: bytes=0-1048575
+
+# Respuesta HTTP 206:
+# Content-Range: bytes 0-1048575/10485760
+# Content-Length: 1048576
+# [chunk de video cifrado]
+
+# 5. Usuario descifra localmente con su KEK
+# RSA-Decrypt(encryptedKekForUser, user_private_key) → KEK
+# ChaCha20-Poly1305-Decrypt(video_chunk, KEK, nonce, authTag) → video_plaintext
+```
+
+---
+
 **Notas:**
 - Arquitectura basada en Clean Architecture / Onion Architecture
 - Separación clara de responsabilidades por capas
@@ -958,3 +1420,6 @@ GET    /api/videos/admin/{adminId}
 - Servicios de negocio son Scoped (DbContext lifecycle)
 - Todas las operaciones criptográficas usan APIs del sistema (.NET Cryptography)
 - File system usado para videos cifrados (escalable a blob storage)
+- **Módulo de distribución de claves implementa zero-knowledge proof: servidor nunca conoce KEK en texto plano del consumidor**
+- **Re-cifrado asimétrico garantiza que cada consumidor solo puede descifrar con su clave privada**
+- **Streaming chunked permite progressive download y seeking en reproductores de video**
