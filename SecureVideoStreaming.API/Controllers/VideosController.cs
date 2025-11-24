@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SecureVideoStreaming.Models.DTOs.Request;
 using SecureVideoStreaming.Services.Business.Interfaces;
 using System.Security.Claims;
 
@@ -33,6 +34,31 @@ namespace SecureVideoStreaming.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al obtener videos");
+                return StatusCode(500, new { message = "Error al obtener videos" });
+            }
+        }
+
+        /// <summary>
+        /// Obtener mis videos (solo administradores)
+        /// </summary>
+        [HttpGet("my-videos")]
+        [Authorize(Roles = "Administrador")]
+        public async Task<IActionResult> GetMyVideos()
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+                {
+                    return Unauthorized(new { message = "Token inválido" });
+                }
+
+                var videos = await _videoService.GetVideosByAdminAsync(userId);
+                return Ok(videos);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener mis videos");
                 return StatusCode(500, new { message = "Error al obtener videos" });
             }
         }
@@ -83,16 +109,17 @@ namespace SecureVideoStreaming.API.Controllers
         [HttpPost("upload")]
         [Authorize(Roles = "Administrador")]
         [RequestSizeLimit(500_000_000)] // 500 MB
-        public async Task<IActionResult> UploadVideo([FromForm] string titulo, [FromForm] string? descripcion, [FromForm] IFormFile videoFile)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadVideo([FromForm] UploadVideoFormRequest request)
         {
             try
             {
-                if (videoFile == null || videoFile.Length == 0)
+                if (request.VideoFile == null || request.VideoFile.Length == 0)
                 {
                     return BadRequest(new { message = "El archivo de video es requerido" });
                 }
 
-                if (string.IsNullOrWhiteSpace(titulo))
+                if (string.IsNullOrWhiteSpace(request.Titulo))
                 {
                     return BadRequest(new { message = "El título es requerido" });
                 }
@@ -104,15 +131,15 @@ namespace SecureVideoStreaming.API.Controllers
                     return Unauthorized(new { message = "Token inválido" });
                 }
 
-                var request = new SecureVideoStreaming.Models.DTOs.Request.UploadVideoRequest
+                var uploadRequest = new UploadVideoRequest
                 {
                     IdAdministrador = userId,
-                    NombreArchivo = videoFile.FileName,
-                    Descripcion = descripcion
+                    NombreArchivo = request.VideoFile.FileName,
+                    Descripcion = request.Descripcion
                 };
 
-                using var stream = videoFile.OpenReadStream();
-                var response = await _videoService.UploadVideoAsync(request, stream);
+                using var stream = request.VideoFile.OpenReadStream();
+                var response = await _videoService.UploadVideoAsync(uploadRequest, stream);
 
                 return Ok(response);
             }
@@ -128,6 +155,84 @@ namespace SecureVideoStreaming.API.Controllers
             {
                 _logger.LogError(ex, "Error al subir video");
                 return StatusCode(500, new { message = "Error al subir video" });
+            }
+        }
+
+        /// <summary>
+        /// Verificar integridad de un video (solo el administrador dueño)
+        /// </summary>
+        [HttpPost("{id}/verify-integrity")]
+        [Authorize(Roles = "Administrador")]
+        public async Task<IActionResult> VerifyVideoIntegrity(int id)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+                {
+                    return Unauthorized(new { message = "Token inválido" });
+                }
+
+                var result = await _videoService.VerifyVideoIntegrityAsync(id, userId);
+                
+                if (!result.Success)
+                {
+                    return BadRequest(result);
+                }
+
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al verificar integridad del video {VideoId}", id);
+                return StatusCode(500, new { message = "Error al verificar integridad" });
+            }
+        }
+
+        /// <summary>
+        /// Actualizar metadata de un video (solo el administrador dueño)
+        /// </summary>
+        [HttpPut("{id}/metadata")]
+        [Authorize(Roles = "Administrador")]
+        public async Task<IActionResult> UpdateVideoMetadata(int id, [FromBody] UpdateVideoMetadataRequest request)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+                {
+                    return Unauthorized(new { message = "Token inválido" });
+                }
+
+                var result = await _videoService.UpdateVideoMetadataAsync(id, request, userId);
+                
+                if (!result.Success)
+                {
+                    return BadRequest(result);
+                }
+
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al actualizar metadata del video {VideoId}", id);
+                return StatusCode(500, new { message = "Error al actualizar metadata" });
             }
         }
 
@@ -148,7 +253,13 @@ namespace SecureVideoStreaming.API.Controllers
                 }
 
                 var result = await _videoService.DeleteVideoAsync(id, userId);
-                return Ok(new { message = "Video eliminado exitosamente", success = result });
+                
+                if (!result.Success)
+                {
+                    return BadRequest(result);
+                }
+
+                return Ok(result);
             }
             catch (KeyNotFoundException ex)
             {

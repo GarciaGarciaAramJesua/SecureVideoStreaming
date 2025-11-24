@@ -7,13 +7,14 @@ namespace SecureVideoStreaming.Models.Entities
         public int IdPermiso { get; set; }
         public int IdVideo { get; set; }
         public int IdUsuario { get; set; }
-        public string TipoPermiso { get; set; } = "Lectura"; // 'Lectura', 'Temporal', 'Revocado'
+        public string TipoPermiso { get; set; } = "Lectura"; // 'Pendiente', 'Aprobado', 'Revocado'
         
         // Metadata
         public DateTime FechaOtorgamiento { get; set; } = DateTime.UtcNow;
         public DateTime? FechaExpiracion { get; set; }
         public DateTime? FechaRevocacion { get; set; }
         public int NumeroAccesos { get; set; } = 0;
+        public int? MaxAccesos { get; set; } // Límite de accesos (null = ilimitado)
         public DateTime? UltimoAcceso { get; set; }
         
         // Otorgamiento y Revocación

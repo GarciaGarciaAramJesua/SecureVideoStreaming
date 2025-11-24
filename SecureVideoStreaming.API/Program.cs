@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using SecureVideoStreaming.Data.Context;
 using SecureVideoStreaming.API.Extensions;
+using SecureVideoStreaming.API.Middleware;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -63,8 +64,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddCryptographyServices();
 
 // Business Services
-builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IAuthService, SecureVideoStreaming.Services.Business.Implementations.AuthService>();
-builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IUserService, SecureVideoStreaming.Services.Business.Implementations.UserService>();
+builder.Services.AddBusinessServices();
 builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IVideoService, SecureVideoStreaming.Services.Business.Implementations.VideoService>();
 builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IPermissionService, SecureVideoStreaming.Services.Business.Implementations.PermissionService>();
 builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IVideoGridService, SecureVideoStreaming.Services.Business.Implementations.VideoGridService>();
@@ -84,6 +84,9 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+// IMPORTANTE: ErrorHandling debe estar PRIMERO para capturar todas las excepciones
+app.UseErrorHandling();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
