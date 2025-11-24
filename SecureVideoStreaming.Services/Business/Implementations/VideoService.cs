@@ -19,6 +19,8 @@ namespace SecureVideoStreaming.Services.Business.Implementations
         private readonly IHmacService _hmacService;
         private readonly IConfiguration _configuration;
         private readonly string _videosPath;
+        private readonly string _keysPath;
+        private readonly string _serverPublicKeyPath;
 
         public VideoService(
             ApplicationDbContext context,
@@ -35,11 +37,17 @@ namespace SecureVideoStreaming.Services.Business.Implementations
             _hmacService = hmacService;
             _configuration = configuration;
             _videosPath = configuration["Storage:VideosPath"] ?? "./Storage/Videos";
+            _keysPath = configuration["Storage:KeysPath"] ?? "./Storage/Keys";
+            _serverPublicKeyPath = Path.Combine(_keysPath, "server_public_key.pem");
 
-            // Crear directorio si no existe
+            // Crear directorios si no existen
             if (!Directory.Exists(_videosPath))
             {
                 Directory.CreateDirectory(_videosPath);
+            }
+            if (!Directory.Exists(_keysPath))
+            {
+                Directory.CreateDirectory(_keysPath);
             }
         }
 
@@ -80,8 +88,8 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                 // 7. Calcular HMAC del video cifrado
                 var hmac = _hmacService.ComputeHmac(ciphertext, userKeys.ClaveHMAC);
 
-                // 8. Cifrar KEK con clave pública del servidor (simulado - en producción usar clave real)
-                var (serverPublicKey, _) = _rsaService.GenerateKeyPair(2048);
+                // 8. Cifrar KEK con clave pública del servidor (persistente)
+                var serverPublicKey = await GetOrCreateServerPublicKeyAsync();
                 var encryptedKek = _rsaService.Encrypt(kek, serverPublicKey);
 
                 // 9. Guardar video cifrado en disco
@@ -277,6 +285,31 @@ namespace SecureVideoStreaming.Services.Business.Implementations
             {
                 return ApiResponse<bool>.ErrorResponse($"Error al eliminar video: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Obtener o crear la clave pública del servidor (persistente)
+        /// Esta clave se usa para cifrar las KEKs de los videos
+        /// </summary>
+        private async Task<string> GetOrCreateServerPublicKeyAsync()
+        {
+            // Si la clave pública existe, leerla
+            if (File.Exists(_serverPublicKeyPath))
+            {
+                return await File.ReadAllTextAsync(_serverPublicKeyPath);
+            }
+
+            // Si no existe, generar el par de claves
+            var (publicKey, privateKey) = _rsaService.GenerateKeyPair(2048);
+            
+            // Guardar clave pública
+            await File.WriteAllTextAsync(_serverPublicKeyPath, publicKey);
+            
+            // Guardar clave privada
+            var privateKeyPath = Path.Combine(_keysPath, "server_private_key.pem");
+            await File.WriteAllTextAsync(privateKeyPath, privateKey);
+
+            return publicKey;
         }
     }
 }

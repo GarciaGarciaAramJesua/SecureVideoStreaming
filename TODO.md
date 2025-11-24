@@ -2,7 +2,7 @@
 
 ## 🎯 Estado Actual del Proyecto
 
-Después de la migración a `Data_base_cripto`, aquí está el estado y las tareas pendientes:
+**Última actualización:** 23 de Noviembre de 2025 - **ENTREGABLE 2 COMPLETADO** 🎉
 
 ---
 
@@ -15,6 +15,54 @@ Después de la migración a `Data_base_cripto`, aquí está el estado y las tare
 - [x] Conexión a BD verificada y funcional
 - [x] Proyecto compila sin errores
 - [x] Servicios criptográficos implementados (ChaCha20, RSA, SHA-256, HMAC)
+
+### **Módulos Completados - Entregable 1**
+- [x] DB Design (100%)
+- [x] Users Sign Up Module (100%)
+- [x] Authentication Module (100%)
+- [x] Key Management Module (100% - Mejorado en Entregable 2)
+- [x] Videos Upload Module (100%)
+- [x] Videos Encryption Module (100%)
+- [x] Owner's Videos Management Module (100%)
+
+### **Módulos Completados - Entregable 2** 🆕
+- [x] **Permissions Module (100%)** ✨
+  - [x] IPermissionService + PermissionService
+  - [x] PermissionsController
+  - [x] Otorgar permisos (Lectura y Temporal)
+  - [x] Revocar permisos
+  - [x] Verificar permisos activos
+  - [x] Listar permisos por video
+  - [x] Listar permisos por usuario
+  - [x] Extender fecha de expiración
+  - [x] Contador de accesos
+  - [x] Validación de ownership
+  - [x] DTOs: GrantPermissionRequest, PermissionResponse
+
+- [x] **Grid Module (100%)** ✨
+  - [x] IVideoGridService + VideoGridService
+  - [x] VideoGridController
+  - [x] Grid completo con información de permisos
+  - [x] Filtros (búsqueda, administrador, solo con permiso)
+  - [x] Estados visuales (Activo, Expirado, Sin Permiso)
+  - [x] Formato de tamaño y duración
+  - [x] DTOs: VideoGridItemResponse
+
+- [x] **Key Distribution Module (100%)** ✨
+  - [x] IKeyDistributionService + KeyDistributionService
+  - [x] KeyDistributionController
+  - [x] Distribución segura de claves con RSA
+  - [x] Re-cifrado con clave pública del usuario
+  - [x] Validación de permisos antes de distribuir
+  - [x] Auditoría de solicitudes (RegistroAccesos)
+  - [x] Persistencia de claves RSA del servidor (CRÍTICO)
+  - [x] Gestión automática de claves del servidor
+  - [x] DTOs: KeyDistributionResponse
+
+### **Mejoras Realizadas**
+- [x] **VideoService actualizado**: Claves RSA del servidor persistentes
+- [x] **Program.cs actualizado**: Registro de nuevos servicios
+- [x] **Problema crítico solucionado**: Videos ahora siempre recuperables
 
 ---
 
@@ -97,7 +145,105 @@ Después de la migración a `Data_base_cripto`, aquí está el estado y las tare
 
 ---
 
-### **4. PermissionService** 🆕 (Crear nuevo)
+---
+
+## 🔨 **Pendiente - Próxima Entrega**
+
+### **1. VideoService - Download/Stream Module** ⏳ (Alta Prioridad)
+**Ubicación:** `SecureVideoStreaming.Services/Business/Implementations/VideoService.cs`
+
+**Método a implementar:**
+- [ ] `DownloadVideoAsync(int userId, int videoId, string ipAddress, string userAgent)`
+  - Verificar permiso activo con PermissionService
+  - Obtener datos criptográficos del video
+  - Obtener KEK cifrada desde KeyDistributionService
+  - Leer archivo cifrado del disco
+  - **Streaming por chunks** (para videos grandes)
+  - Verificar integridad (SHA-256 y HMAC)
+  - Registrar acceso en `RegistroAccesos` 
+  - Actualizar `NumeroAccesos` en `Permisos`
+  - Retornar Stream del video descifrado
+
+**Endpoint requerido:**
+```csharp
+GET /api/videos/{id}/download   // Descarga completa
+GET /api/videos/{id}/stream      // Streaming progresivo
+```
+
+**Consideraciones críticas:**
+- **NO cargar video completo en memoria** (usar `FileStream` + chunks)
+- Descifrar por bloques (streaming decryption)
+- Manejar `Range` headers para video seeking
+- Content-Type apropiado según formato
+- Cleanup de recursos temporales
+
+---
+
+### **2. Frontend Razor Pages** ⏳ (Media Prioridad)
+
+#### **VideoGrid.cshtml** (Nueva página)
+- [ ] Grid responsive con cards de videos
+- [ ] Badges de estado de permisos
+- [ ] Filtros interactivos
+- [ ] Botón "Ver" (solo si tiene permiso)
+- [ ] Botón "Solicitar Acceso" (sin permiso)
+- [ ] Paginación
+
+#### **VideoPlayer.cshtml** (Nueva página)
+- [ ] Reproductor HTML5 `<video>`
+- [ ] Descarga de claves automática
+- [ ] Descifrado en cliente con Web Crypto API
+- [ ] Controles de reproducción
+- [ ] Información del video
+- [ ] Verificación de integridad en cliente
+
+#### **ManagePermissions.cshtml** (Nueva página para admins)
+- [ ] Lista de permisos por video
+- [ ] Formulario para otorgar permisos
+- [ ] Botones de revocar/extender
+- [ ] Estadísticas de acceso
+- [ ] Filtros y búsqueda
+
+#### **Actualizar Home.cshtml**
+- [ ] Integrar grid de videos
+- [ ] Dashboard con estadísticas
+- [ ] Acciones rápidas
+
+---
+
+### **3. Optimizaciones** ⏳ (Baja Prioridad)
+
+#### **Caching**
+- [ ] Cache de permisos en Redis
+- [ ] Cache de claves públicas
+- [ ] Cache de metadata de videos
+
+#### **Performance**
+- [ ] Índices en BD para consultas frecuentes
+- [ ] Compresión de videos antes de cifrar
+- [ ] Thumbnails de videos
+- [ ] CDN para contenido estático
+
+#### **Seguridad**
+- [ ] Rate limiting en endpoints de claves
+- [ ] IP whitelisting para admins
+- [ ] 2FA para administradores
+- [ ] Audit log viewer
+- [ ] Backup automático de claves del servidor
+
+---
+
+### **4. Testing** ⏳ (Media Prioridad)
+- [ ] Unit tests para PermissionService
+- [ ] Unit tests para VideoGridService
+- [ ] Unit tests para KeyDistributionService
+- [ ] Integration tests para flujo completo
+- [ ] Performance tests con videos grandes
+- [ ] Security tests (penetration testing)
+
+---
+
+### **4. PermissionService** ✅ **COMPLETADO**
 **Ubicación:** `SecureVideoStreaming.Services/Business/Implementations/PermissionService.cs`
 
 **Métodos a implementar:**

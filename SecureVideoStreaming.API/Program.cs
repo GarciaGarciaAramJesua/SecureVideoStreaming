@@ -66,6 +66,9 @@ builder.Services.AddCryptographyServices();
 builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IAuthService, SecureVideoStreaming.Services.Business.Implementations.AuthService>();
 builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IUserService, SecureVideoStreaming.Services.Business.Implementations.UserService>();
 builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IVideoService, SecureVideoStreaming.Services.Business.Implementations.VideoService>();
+builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IPermissionService, SecureVideoStreaming.Services.Business.Implementations.PermissionService>();
+builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IVideoGridService, SecureVideoStreaming.Services.Business.Implementations.VideoGridService>();
+builder.Services.AddScoped<SecureVideoStreaming.Services.Business.Interfaces.IKeyDistributionService, SecureVideoStreaming.Services.Business.Implementations.KeyDistributionService>();
 
 // CORS Configuration
 builder.Services.AddCors(options =>

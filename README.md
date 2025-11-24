@@ -1,10 +1,16 @@
-# Entregable Semana 1 - Módulo de Criptografía Base
+# Secure Video Streaming - Sistema de Streaming Seguro
 
-## Proyecto: Secure Video Streaming
+## 🎯 Proyecto de Criptografía Aplicada
 
-### Fecha: 03 de Noviembre de 2025
-### García García Aram Jesua
-### Hernández Díaz Roberto Angel
+### 📅 Última Actualización: 23 de Noviembre de 2025
+### 👥 Autores
+- **García García Aram Jesua**
+- **Hernández Díaz Roberto Angel**
+
+### 📊 Estado del Proyecto
+- **Progreso:** 90% Completo
+- **Módulos Funcionales:** 10/11
+- **Última Entrega:** Entregable 2 - Permissions, Grid y Key Distribution ✅
 
 ---
 
@@ -61,6 +67,39 @@ SecureVideoStreaming/
 ### 2.5 KMAC256
 - **Propósito**: MAC moderno basado en SHA-3
 - **Uso**: Autenticación de metadata
+
+---
+
+## 🚀 Módulos Implementados
+
+### ✅ Entregable 1 (Completado)
+1. **DB Design** - Base de datos completa con 6 tablas
+2. **Users Sign Up** - Registro con RSA + HMAC
+3. **Authentication** - JWT + PBKDF2
+4. **Key Management** - Gestión de claves criptográficas
+5. **Videos Upload** - Subida y cifrado automático
+6. **Videos Encryption** - ChaCha20-Poly1305 AEAD
+7. **Owner Management** - CRUD de videos del admin
+
+### ✅ Entregable 2 (Completado) 🆕
+8. **Permissions Module** - Control de acceso granular
+   - Otorgar/revocar permisos
+   - Permisos permanentes y temporales
+   - Validación de expiración
+   - Contador de accesos
+
+9. **Grid Module** - Catálogo de videos
+   - Vista con información de permisos
+   - Filtros avanzados
+   - Estados visuales
+
+10. **Key Distribution** - Distribución segura
+    - Re-cifrado con RSA del usuario
+    - Persistencia de claves del servidor
+    - Auditoría completa
+
+### ⏳ Próximo Entregable
+11. **Download/Stream Module** - Descarga y reproducción segura
 
 ---
 

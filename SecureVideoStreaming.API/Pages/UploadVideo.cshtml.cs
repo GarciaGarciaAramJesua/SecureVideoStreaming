@@ -31,13 +31,15 @@ namespace SecureVideoStreaming.API.Pages
             var username = HttpContext.Session.GetString("Username");
             if (string.IsNullOrEmpty(username))
             {
+                TempData["ErrorMessage"] = "Debes iniciar sesión para acceder a esta página";
                 return RedirectToPage("/Login");
             }
 
-            // Verificar si es administrador
+            // Verificar si es Owner (Administrador)
             var userType = HttpContext.Session.GetString("UserType");
-            if (userType != "Administrador")
+            if (userType != "Owner")
             {
+                TempData["ErrorMessage"] = "Solo los administradores pueden subir videos";
                 return RedirectToPage("/Home");
             }
 
@@ -49,11 +51,12 @@ namespace SecureVideoStreaming.API.Pages
             var username = HttpContext.Session.GetString("Username");
             if (string.IsNullOrEmpty(username))
             {
+                TempData["ErrorMessage"] = "Debes iniciar sesión para subir videos";
                 return RedirectToPage("/Login");
             }
 
             var userType = HttpContext.Session.GetString("UserType");
-            if (userType != "Administrador")
+            if (userType != "Owner")
             {
                 ErrorMessage = "Solo los administradores pueden subir videos";
                 return Page();
