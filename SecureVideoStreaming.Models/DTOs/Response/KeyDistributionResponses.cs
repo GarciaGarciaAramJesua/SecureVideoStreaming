@@ -1,27 +1,6 @@
 namespace SecureVideoStreaming.Models.DTOs.Response
 {
     /// <summary>
-    /// Respuesta de permiso de acceso a video
-    /// </summary>
-    public class PermissionResponse
-    {
-        public int IdPermiso { get; set; }
-        public int IdVideo { get; set; }
-        public string TituloVideo { get; set; } = string.Empty;
-        public int IdUsuario { get; set; }
-        public string NombreUsuario { get; set; } = string.Empty;
-        public string TipoPermiso { get; set; } = string.Empty;
-        public DateTime FechaOtorgamiento { get; set; }
-        public DateTime? FechaExpiracion { get; set; }
-        public DateTime? FechaRevocacion { get; set; }
-        public int? NumeroAccesos { get; set; }
-        public int? AccesosRestantes { get; set; }
-        public bool EstaActivo { get; set; }
-        public bool EstaExpirado { get; set; }
-        public string? MensajeEstado { get; set; }
-    }
-
-    /// <summary>
     /// Paquete de claves criptográficas para consumidor
     /// </summary>
     public class KeyPackageResponse

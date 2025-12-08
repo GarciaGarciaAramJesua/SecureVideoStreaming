@@ -31,10 +31,12 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                         && p.FechaRevocacion == null)
                     .ToListAsync();
 
+                var validPermissionTypes = new[] { "Aprobado", "Lectura", "Temporal" };
+
                 var gridItems = videos.Select(video =>
                 {
                     var permiso = permisos.FirstOrDefault(p => p.IdVideo == video.IdVideo);
-                    bool tienePermiso = permiso != null;
+                    bool tienePermiso = permiso != null && validPermissionTypes.Contains(permiso.TipoPermiso);
                     bool estaExpirado = permiso?.FechaExpiracion.HasValue == true 
                         && permiso.FechaExpiracion.Value < DateTime.UtcNow;
                     bool permiteVisualizacion = tienePermiso && !estaExpirado;
@@ -110,10 +112,12 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                     .Where(p => p.IdUsuario == userId && p.FechaRevocacion == null)
                     .ToListAsync();
 
+                var validPermissionTypes = new[] { "Aprobado", "Lectura", "Temporal" };
+
                 var gridItems = videos.Select(video =>
                 {
                     var permiso = permisos.FirstOrDefault(p => p.IdVideo == video.IdVideo);
-                    bool tienePermiso = permiso != null;
+                    bool tienePermiso = permiso != null && validPermissionTypes.Contains(permiso.TipoPermiso);
                     bool estaExpirado = permiso?.FechaExpiracion.HasValue == true
                         && permiso.FechaExpiracion.Value < DateTime.UtcNow;
                     bool permiteVisualizacion = tienePermiso && !estaExpirado;

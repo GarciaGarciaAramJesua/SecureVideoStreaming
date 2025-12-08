@@ -1,0 +1,258 @@
+@page
+@model SecureVideoStreaming.API.Pages.VideoPlayerModel
+@{
+    ViewData["Title"] = "Reproductor de Video";
+}
+
+@* Anti-forgery token para peticiones AJAX POST *@
+@Html.AntiForgeryToken()
+
+<div class="container-fluid py-4">
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage) || !Model.HasAccess)
+    {
+        <!-- Sin Acceso -->
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="alert alert-danger" role="alert">
+                    <i class="bi bi-lock-fill fs-1 d-block text-center mb-3"></i>
+                    <h4 class="alert-heading text-center">Acceso Denegado</h4>
+                    <p class="text-center mb-3">@(Model.ErrorMessage ?? "No tienes permiso para ver este video")</p>
+                    <hr>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="/VideoGrid" class="btn btn-primary">
+                            <i class="bi bi-grid-3x3-gap me-1"></i>Volver al Catálogo
+                        </a>
+                        <a href="/MyPermissions" class="btn btn-outline-secondary">
+                            <i class="bi bi-key me-1"></i>Mis Permisos
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else if (Model.Video != null)
+    {
+        <!-- Encabezado del Video -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/Home">Home</a></li>
+                        <li class="breadcrumb-item"><a href="/VideoGrid">Videos</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">@Model.Video.TituloVideo</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Columna del Reproductor -->
+            <div class="col-lg-8 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-body p-0">
+                        <!-- Área del Reproductor -->
+                        <div id="videoContainer" class="bg-dark position-relative" style="min-height: 500px;">
+                            <!-- Loading -->
+                            <div id="loadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-dark">
+                                <div class="text-center text-white">
+                                    <div class="spinner-border mb-3" role="status" style="width: 3rem; height: 3rem;">
+                                        <span class="visually-hidden">Cargando...</span>
+                                    </div>
+                                    <p id="loadingStatus">Inicializando reproductor...</p>
+                                    <small id="loadingDetails" class="text-muted"></small>
+                                </div>
+                            </div>
+
+                            <!-- Error Overlay -->
+                            <div id="errorOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-dark">
+                                <div class="text-center text-white p-4">
+                                    <i class="bi bi-exclamation-triangle-fill display-1 text-warning mb-3"></i>
+                                    <h4>Error al Reproducir Video</h4>
+                                    <p id="errorMessage" class="text-muted"></p>
+                                    <button class="btn btn-primary mt-3" onclick="retryDecryption()">
+                                        <i class="bi bi-arrow-clockwise me-1"></i>Reintentar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Video Player -->
+                            <video id="videoPlayer" class="w-100" controls style="max-height: 500px; display: none;">
+                                Tu navegador no soporta el elemento de video.
+                            </video>
+                        </div>
+                    </div>
+
+                    <!-- Controles y Estado -->
+                    <div class="card-footer">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h5 class="mb-1">@Model.Video.TituloVideo</h5>
+                                <small class="text-muted">
+                                    <i class="bi bi-shield-lock"></i> Cifrado: ChaCha20-Poly1305 | 
+                                    <i class="bi bi-key"></i> Distribución: RSA-OAEP
+                                </small>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <span class="badge bg-success" id="decryptionStatus">
+                                    <i class="bi bi-hourglass-split"></i> Preparando...
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información del Video -->
+                <div class="card shadow-sm mt-3">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="bi bi-info-circle me-1"></i>Descripción</h6>
+                        <p class="card-text">@(Model.Video.Descripcion ?? "Sin descripción disponible")</p>
+                        
+                        <hr/>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <small class="text-muted d-block">Administrador</small>
+                                <strong>@Model.Video.NombreAdministrador</strong>
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted d-block">Fecha de Subida</small>
+                                <strong>@Model.Video.FechaSubida.ToString("dd/MM/yyyy HH:mm")</strong>
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted d-block">Tamaño</small>
+                                <strong>@($"{Model.Video.TamañoArchivo / (1024.0 * 1024.0):F2} MB")</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna de Información -->
+            <div class="col-lg-4 mb-4">
+                <!-- Información del Permiso -->
+                @if (Model.Permission != null)
+                {
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-success text-white">
+                            <i class="bi bi-shield-check me-1"></i>Tu Permiso de Acceso
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <small class="text-muted">Tipo de Permiso</small>
+                                <div><span class="badge bg-info">@Model.Permission.TipoPermiso</span></div>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">Otorgado por</small>
+                                <div><strong>@Model.Permission.NombreOtorgante</strong></div>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">Fecha de Otorgamiento</small>
+                                <div>@Model.Permission.FechaOtorgamiento.ToString("dd/MM/yyyy HH:mm")</div>
+                            </div>
+                            @if (Model.Permission.FechaExpiracion.HasValue)
+                            {
+                                <div class="mb-2">
+                                    <small class="text-muted">Fecha de Expiración</small>
+                                    <div class="text-warning">
+                                        <i class="bi bi-hourglass"></i> @Model.Permission.FechaExpiracion.Value.ToString("dd/MM/yyyy HH:mm")
+                                    </div>
+                                </div>
+                            }
+                            <div class="mb-0">
+                                <small class="text-muted">Visualizaciones</small>
+                                <div><strong>@Model.Permission.NumeroAccesos</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Proceso de Descifrado (Modelo de Claves Efímeras) -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-shield-check me-1"></i>Seguridad Mejorada
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-success mb-3">
+                            <i class="bi bi-info-circle"></i>
+                            <small><strong>Modelo de Claves Efímeras:</strong> Las claves solo existen en memoria RAM durante la reproducción.</small>
+                        </div>
+                        <ul class="list-unstyled mb-0" id="decryptionSteps">
+                            <li class="mb-2">
+                                <i class="bi bi-circle text-muted" id="step1Icon"></i>
+                                <span id="step1Text">1. Generar claves temporales RSA</span>
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-circle text-muted" id="step2Icon"></i>
+                                <span id="step2Text">2. Verificar autenticación</span>
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-circle text-muted" id="step3Icon"></i>
+                                <span id="step3Text">3. Solicitar video al servidor</span>
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-circle text-muted" id="step4Icon"></i>
+                                <span id="step4Text">4. Preparar reproducción</span>
+                            </li>
+                            <li class="mb-0">
+                                <i class="bi bi-circle text-muted" id="step5Icon"></i>
+                                <span id="step5Text">5. Configurar reproductor</span>
+                            </li>
+                        </ul>
+                        <hr/>
+                        <small class="text-muted">
+                            <i class="bi bi-shield-lock"></i> Las claves se destruyen automáticamente al cerrar esta pestaña.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Acciones -->
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="/VideoGrid" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Volver al Catálogo
+                            </a>
+                            <a href="/MyPermissions" class="btn btn-outline-info">
+                                <i class="bi bi-key me-1"></i>Mis Permisos
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script src="~/js/video-decryption-simplified.js?v=2.0"></script>
+    
+    <script>
+        const videoId = @Model.Id;
+        const userId = @Model.UserId;
+        
+        // Iniciar el proceso de streaming cuando se cargue la página
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                console.log('[VideoPlayer] DOMContentLoaded - Iniciando proceso de streaming...');
+                await initializeVideoPlayer(videoId, userId);
+            } catch (error) {
+                console.error('Error al inicializar el reproductor:', error);
+                
+                // Mostrar error en la UI
+                const errorOverlay = document.getElementById('errorOverlay');
+                const errorMessage = document.getElementById('errorMessage');
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                
+                if (loadingOverlay) loadingOverlay.classList.add('d-none');
+                if (errorOverlay) errorOverlay.classList.remove('d-none');
+                if (errorMessage) errorMessage.textContent = error.message || 'Error desconocido al inicializar el reproductor';
+            }
+        });
+
+        function retryDecryption() {
+            document.getElementById('errorOverlay').classList.add('d-none');
+            document.getElementById('loadingOverlay').classList.remove('d-none');
+            initializeVideoPlayer(videoId, userId);
+        }
+    </script>
+}

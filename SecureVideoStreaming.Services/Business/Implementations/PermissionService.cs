@@ -1,16 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using SecureVideoStreaming.Data.Context;
-<<<<<<< HEAD
 using SecureVideoStreaming.Models.DTOs.Request;
 using SecureVideoStreaming.Models.DTOs.Response;
 using SecureVideoStreaming.Models.Entities;
 using SecureVideoStreaming.Services.Business.Interfaces;
-=======
-using SecureVideoStreaming.Models.DTOs.Response;
-using SecureVideoStreaming.Models.Entities;
-using SecureVideoStreaming.Services.Business.Interfaces;
 using SecureVideoStreaming.Services.Exceptions;
->>>>>>> 15998941304142dc5144d5f74b8ee48b369d7458
 
 namespace SecureVideoStreaming.Services.Business.Implementations
 {
@@ -23,7 +17,6 @@ namespace SecureVideoStreaming.Services.Business.Implementations
             _context = context;
         }
 
-<<<<<<< HEAD
         public async Task<ApiResponse<PermissionResponse>> GrantPermissionAsync(GrantPermissionRequest request)
         {
             try
@@ -334,28 +327,6 @@ namespace SecureVideoStreaming.Services.Business.Implementations
             }
         }
 
-        public async Task<ApiResponse<bool>> IncrementAccessCountAsync(int permissionId)
-        {
-            try
-            {
-                var permission = await _context.Permisos.FindAsync(permissionId);
-                if (permission == null)
-                {
-                    return ApiResponse<bool>.ErrorResponse("Permiso no encontrado");
-                }
-
-                permission.NumeroAccesos++;
-                permission.UltimoAcceso = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
-
-                return ApiResponse<bool>.SuccessResponse(true);
-            }
-            catch (Exception ex)
-            {
-                return ApiResponse<bool>.ErrorResponse($"Error al actualizar contador: {ex.Message}");
-            }
-        }
-
         private PermissionResponse MapToResponse(Permission permission)
         {
             bool isExpired = permission.FechaExpiracion.HasValue 
@@ -382,7 +353,9 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                 NombreRevocador = permission.UsuarioRevocador?.NombreUsuario,
                 EstaActivo = isActive,
                 EstaExpirado = isExpired
-=======
+            };
+        }
+
         public async Task<ApiResponse<PermissionResponse>> RequestAccessAsync(int videoId, int userId, string justificacion)
         {
             // Validar que el video existe
@@ -428,7 +401,9 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                 IdUsuario = userId,
                 TipoPermiso = "Pendiente",
                 FechaOtorgamiento = DateTime.UtcNow,
-                NumeroAccesos = 0
+                NumeroAccesos = 0,
+                Justificacion = justificacion,
+                OtorgadoPor = video.IdAdministrador // El admin del video
             };
 
             _context.Permisos.Add(permiso);
@@ -441,11 +416,14 @@ namespace SecureVideoStreaming.Services.Business.Implementations
 
         public async Task<ApiResponse<bool>> HasAccessAsync(int videoId, int userId)
         {
+            // Tipos de permiso válidos: Aprobado (solicitudes aprobadas), Lectura y Temporal (otorgados directamente)
+            var validPermissionTypes = new[] { "Aprobado", "Lectura", "Temporal" };
+            
             var permiso = await _context.Permisos
                 .FirstOrDefaultAsync(p => 
                     p.IdVideo == videoId && 
                     p.IdUsuario == userId && 
-                    p.TipoPermiso == "Aprobado" &&
+                    validPermissionTypes.Contains(p.TipoPermiso) &&
                     !p.FechaRevocacion.HasValue);
 
             if (permiso == null) 
@@ -468,13 +446,17 @@ namespace SecureVideoStreaming.Services.Business.Implementations
 
         public async Task<ApiResponse<PermissionResponse>> GetPermissionAsync(int videoId, int userId)
         {
+            // Tipos de permiso válidos: Aprobado (solicitudes aprobadas), Lectura y Temporal (otorgados directamente)
+            var validPermissionTypes = new[] { "Aprobado", "Lectura", "Temporal" };
+            
             var permiso = await _context.Permisos
                 .Include(p => p.Video)
                 .Include(p => p.Usuario)
                 .FirstOrDefaultAsync(p => 
                     p.IdVideo == videoId && 
                     p.IdUsuario == userId &&
-                    p.TipoPermiso == "Aprobado");
+                    validPermissionTypes.Contains(p.TipoPermiso) &&
+                    !p.FechaRevocacion.HasValue);
 
             if (permiso == null) 
                 return ApiResponse<PermissionResponse>.ErrorResponse("Permiso no encontrado");
@@ -597,6 +579,124 @@ namespace SecureVideoStreaming.Services.Business.Implementations
             await _context.SaveChangesAsync();
         }
 
+        public async Task<ApiResponse<List<PermissionResponse>>> GetPendingRequestsByAdminAsync(int adminId)
+        {
+            try
+            {
+                Console.WriteLine($"[DEBUG] GetPendingRequestsByAdminAsync - Admin ID: {adminId}");
+                
+                // Primero, obtener TODOS los permisos sin filtro para ver qué hay
+                var allPermisos = await _context.Permisos
+                    .Include(p => p.Video)
+                    .Include(p => p.Usuario)
+                    .ToListAsync();
+                
+                Console.WriteLine($"[DEBUG] Total de permisos en BD: {allPermisos.Count}");
+                foreach (var p in allPermisos)
+                {
+                    Console.WriteLine($"[DEBUG] Permiso ID:{p.IdPermiso}, Video:{p.IdVideo}, Admin del video:{p.Video?.IdAdministrador}, Usuario:{p.IdUsuario}, Tipo:'{p.TipoPermiso}'");
+                }
+                
+                // Obtener todas las solicitudes pendientes para los videos del administrador
+                var pendingRequests = await _context.Permisos
+                    .Include(p => p.Video)
+                    .Include(p => p.Usuario)
+                    .Where(p => p.Video.IdAdministrador == adminId && p.TipoPermiso == "Pendiente")
+                    .OrderByDescending(p => p.FechaOtorgamiento)
+                    .ToListAsync();
+
+                Console.WriteLine($"[DEBUG] Se encontraron {pendingRequests.Count} solicitudes pendientes para admin {adminId}");
+                
+                foreach (var req in pendingRequests)
+                {
+                    Console.WriteLine($"[DEBUG] Solicitud - ID: {req.IdPermiso}, Video: {req.Video?.TituloVideo}, Usuario: {req.Usuario?.NombreUsuario}, Tipo: {req.TipoPermiso}");
+                }
+
+                var responses = pendingRequests.Select(p => new PermissionResponse
+                {
+                    IdPermiso = p.IdPermiso,
+                    IdVideo = p.IdVideo,
+                    TituloVideo = p.Video.TituloVideo,
+                    IdUsuario = p.IdUsuario,
+                    NombreUsuario = p.Usuario.NombreUsuario,
+                    TipoPermiso = p.TipoPermiso,
+                    FechaOtorgamiento = p.FechaOtorgamiento,
+                    Justificacion = p.Justificacion,
+                    EstaActivo = false,
+                    MensajeEstado = "Pendiente de aprobación"
+                }).ToList();
+
+                return ApiResponse<List<PermissionResponse>>.SuccessResponse(
+                    responses,
+                    $"Se encontraron {responses.Count} solicitudes pendientes"
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<List<PermissionResponse>>.ErrorResponse(
+                    $"Error al obtener solicitudes pendientes: {ex.Message}"
+                );
+            }
+        }
+
+        public async Task<ApiResponse<PermissionResponse>> ApprovePermissionAsync(
+            int permissionId, 
+            int adminId, 
+            DateTime? fechaExpiracion = null, 
+            int? limiteAccesos = null)
+        {
+            try
+            {
+                // Obtener el permiso con sus relaciones
+                var permiso = await _context.Permisos
+                    .Include(p => p.Video)
+                    .Include(p => p.Usuario)
+                    .FirstOrDefaultAsync(p => p.IdPermiso == permissionId);
+
+                if (permiso == null)
+                {
+                    return ApiResponse<PermissionResponse>.ErrorResponse("Solicitud no encontrada");
+                }
+
+                // Verificar que el admin es el dueño del video
+                if (permiso.Video.IdAdministrador != adminId)
+                {
+                    return ApiResponse<PermissionResponse>.ErrorResponse(
+                        "Solo el administrador dueño del video puede aprobar solicitudes"
+                    );
+                }
+
+                // Verificar que el permiso está pendiente
+                if (permiso.TipoPermiso != "Pendiente")
+                {
+                    return ApiResponse<PermissionResponse>.ErrorResponse(
+                        "Esta solicitud ya fue procesada"
+                    );
+                }
+
+                // Aprobar la solicitud
+                permiso.TipoPermiso = "Aprobado";
+                permiso.FechaExpiracion = fechaExpiracion;
+                permiso.MaxAccesos = limiteAccesos;
+                permiso.NumeroAccesos = 0; // Reiniciar contador al aprobar
+
+                await _context.SaveChangesAsync();
+
+                var response = MapToResponse(permiso, permiso.Video, permiso.Usuario);
+
+                return ApiResponse<PermissionResponse>.SuccessResponse(
+                    response,
+                    "Solicitud aprobada correctamente"
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<PermissionResponse>.ErrorResponse(
+                    $"Error al aprobar solicitud: {ex.Message}"
+                );
+            }
+        }
+
         private static PermissionResponse MapToResponse(Permission permiso, Video video, User usuario)
         {
             var estaExpirado = permiso.FechaExpiracion.HasValue && permiso.FechaExpiracion < DateTime.UtcNow;
@@ -636,7 +736,6 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                 EstaActivo = estaActivo,
                 EstaExpirado = estaExpirado,
                 MensajeEstado = mensajeEstado
->>>>>>> 15998941304142dc5144d5f74b8ee48b369d7458
             };
         }
     }

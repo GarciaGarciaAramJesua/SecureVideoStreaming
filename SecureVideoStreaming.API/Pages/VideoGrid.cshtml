@@ -190,14 +190,19 @@
                             <div class="d-grid gap-2">
                                 @if (video.PermiteVisualizacion)
                                 {
-                                    <a href="/api/keydistribution/request/@video.IdVideo" 
-                                       class="btn btn-success btn-sm">
-                                        <i class="bi bi-key-fill"></i> Solicitar Claves
-                                    </a>
-                                    <button class="btn btn-primary btn-sm" 
-                                            onclick="verDetalles(@video.IdVideo)">
+                                    <a asp-page="/VideoPlayer" 
+                                       asp-route-id="@video.IdVideo"
+                                       class="btn btn-primary btn-sm">
                                         <i class="bi bi-play-fill"></i> Ver Video
-                                    </button>
+                                    </a>
+                                }
+                                else if (!video.TienePermiso)
+                                {
+                                    <a asp-page="/RequestAccess" 
+                                       asp-route-videoId="@video.IdVideo"
+                                       class="btn btn-success btn-sm">
+                                        <i class="bi bi-key-fill"></i> Solicitar Acceso
+                                    </a>
                                 }
                                 else if (video.EstadoPermiso == "Expirado")
                                 {
@@ -288,17 +293,20 @@
             modal.show();
             
             try {
-                const response = await fetch(`/api/videogrid/${videoId}`, {
-                    headers: {
-                        'Authorization': 'Bearer ' + sessionStorage.getItem('token')
-                    }
-                });
+                // Usar handler de Razor Page en lugar de API endpoint (usa Session en lugar de JWT)
+                const response = await fetch(`/VideoGrid?handler=VideoDetails&videoId=${videoId}`);
                 
                 if (!response.ok) {
                     throw new Error('Error al cargar detalles');
                 }
                 
-                const data = await response.json();
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.message || 'Error al cargar detalles');
+                }
+                
+                const data = result;
                 const video = data.data;
                 
                 contenido.innerHTML = `

@@ -46,3 +46,26 @@ Keys/
 *.key
 *.pem
 *.pfx
+
+# Archivos temporales y basura
+*.html
+*.sql
+*_BORRADOR.md
+*_TEMP.md
+*_OLD.md
+*_BACKUP.md
+.DS_Store
+Thumbs.db
+
+# Documentación obsoleta o redundante
+# (Solo mantener: README, ARQUITECTURA, MIGRACION_*, LIMPIAR_CACHE, OTORGAR_PERMISOS_SQL, PRUEBAS, TODO)
+ENTREGABLE_*.md
+RESUMEN_*.md
+ARCHIVOS_*.md
+FLUJO_*.md
+MODULO_*.md
+GUIA_*.md
+INICIO_*.md
+VISTA_*.md
+COMO_*.md
+AUTENTICACION_FIXED.md

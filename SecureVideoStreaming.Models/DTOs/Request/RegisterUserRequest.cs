@@ -20,5 +20,11 @@ namespace SecureVideoStreaming.Models.DTOs.Request
         [Required(ErrorMessage = "El tipo de usuario es requerido")]
         [RegularExpression("^(Administrador|Usuario)$", ErrorMessage = "Tipo de usuario debe ser 'Administrador' o 'Usuario'")]
         public string TipoUsuario { get; set; } = "Usuario"; // "Administrador" o "Usuario"
+
+        /// <summary>
+        /// Clave pública RSA generada en el cliente (solo para usuarios tipo "Usuario" - consumidores)
+        /// Los administradores generan sus claves en el servidor por seguridad
+        /// </summary>
+        public string? ClavePublicaRSA { get; set; }
     }
 }

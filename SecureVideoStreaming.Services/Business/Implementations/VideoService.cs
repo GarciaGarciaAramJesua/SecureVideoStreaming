@@ -15,6 +15,8 @@ namespace SecureVideoStreaming.Services.Business.Implementations
         private readonly ApplicationDbContext _context;
         private readonly IVideoEncryptionService _videoEncryptionService;
         private readonly IKeyManagementService _keyManagementService;
+        private readonly IChaCha20Poly1305Service _chaCha20Service;
+        private readonly IRsaService _rsaService;
         private readonly IConfiguration _configuration;
         private readonly string _videosPath;
         private readonly string _keysPath;
@@ -24,11 +26,15 @@ namespace SecureVideoStreaming.Services.Business.Implementations
             ApplicationDbContext context,
             IVideoEncryptionService videoEncryptionService,
             IKeyManagementService keyManagementService,
+            IChaCha20Poly1305Service chaCha20Service,
+            IRsaService rsaService,
             IConfiguration configuration)
         {
             _context = context;
             _videoEncryptionService = videoEncryptionService;
             _keyManagementService = keyManagementService;
+            _chaCha20Service = chaCha20Service;
+            _rsaService = rsaService;
             _configuration = configuration;
             _videosPath = configuration["Storage:VideosPath"] ?? "./Storage/Videos";
             _keysPath = configuration["Storage:KeysPath"] ?? "./Storage/Keys";
@@ -67,19 +73,12 @@ namespace SecureVideoStreaming.Services.Business.Implementations
 
                 // 3. Obtener clave pública del servidor
                 var serverPublicKey = _keyManagementService.GetServerPublicKey();
-
-<<<<<<< HEAD
-                // 8. Cifrar KEK con clave pública del servidor (persistente)
-                var serverPublicKey = await GetOrCreateServerPublicKeyAsync();
-                var encryptedKek = _rsaService.Encrypt(kek, serverPublicKey);
-=======
                 // 4. Guardar video original temporalmente
                 var tempOriginalPath = Path.Combine(_videosPath, $"temp_{Guid.NewGuid()}.tmp");
                 await using (var fileStream = new FileStream(tempOriginalPath, FileMode.Create, FileAccess.Write))
                 {
                     await videoStream.CopyToAsync(fileStream);
                 }
->>>>>>> 15998941304142dc5144d5f74b8ee48b369d7458
 
                 // 5. Cifrar video usando VideoEncryptionService
                 var nombreArchivoCifrado = $"{Guid.NewGuid()}.encrypted";
@@ -288,31 +287,10 @@ namespace SecureVideoStreaming.Services.Business.Implementations
             }
         }
 
-<<<<<<< HEAD
         /// <summary>
         /// Obtener o crear la clave pública del servidor (persistente)
         /// Esta clave se usa para cifrar las KEKs de los videos
         /// </summary>
-        private async Task<string> GetOrCreateServerPublicKeyAsync()
-        {
-            // Si la clave pública existe, leerla
-            if (File.Exists(_serverPublicKeyPath))
-            {
-                return await File.ReadAllTextAsync(_serverPublicKeyPath);
-            }
-
-            // Si no existe, generar el par de claves
-            var (publicKey, privateKey) = _rsaService.GenerateKeyPair(2048);
-            
-            // Guardar clave pública
-            await File.WriteAllTextAsync(_serverPublicKeyPath, publicKey);
-            
-            // Guardar clave privada
-            var privateKeyPath = Path.Combine(_keysPath, "server_private_key.pem");
-            await File.WriteAllTextAsync(privateKeyPath, privateKey);
-
-            return publicKey;
-=======
         public async Task<ApiResponse<VideoIntegrityResponse>> VerifyVideoIntegrityAsync(int videoId, int adminId)
         {
             try
@@ -347,9 +325,34 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                     return ApiResponse<VideoIntegrityResponse>.ErrorResponse("No se encontró la clave HMAC del administrador");
                 }
 
+                // Determinar la ruta completa del archivo cifrado
+                string encryptedFilePath;
+                if (Path.IsPathRooted(video.RutaAlmacenamiento) || 
+                    video.RutaAlmacenamiento.StartsWith("./") || 
+                    video.RutaAlmacenamiento.StartsWith(".\\"))
+                {
+                    encryptedFilePath = video.RutaAlmacenamiento;
+                }
+                else
+                {
+                    encryptedFilePath = Path.Combine(_videosPath, video.RutaAlmacenamiento);
+                }
+
+                Console.WriteLine($"[VerifyVideoIntegrityAsync] Video ID: {videoId}");
+                Console.WriteLine($"[VerifyVideoIntegrityAsync] RutaAlmacenamiento de BD: {video.RutaAlmacenamiento}");
+                Console.WriteLine($"[VerifyVideoIntegrityAsync] _videosPath: {_videosPath}");
+                Console.WriteLine($"[VerifyVideoIntegrityAsync] Ruta completa computada: {encryptedFilePath}");
+                Console.WriteLine($"[VerifyVideoIntegrityAsync] Archivo existe: {File.Exists(encryptedFilePath)}");
+
+                // Verificar que el archivo existe antes de verificar integridad
+                if (!File.Exists(encryptedFilePath))
+                {
+                    return ApiResponse<VideoIntegrityResponse>.ErrorResponse($"Archivo cifrado no encontrado en: {encryptedFilePath}");
+                }
+
                 // Verificar integridad del video
                 var isValid = _videoEncryptionService.VerifyVideoIntegrity(
-                    video.RutaAlmacenamiento,
+                    encryptedFilePath,
                     cryptoData.HMACDelVideo,
                     userKeys.ClaveHMAC
                 );
@@ -430,7 +433,262 @@ namespace SecureVideoStreaming.Services.Business.Implementations
             {
                 return ApiResponse<VideoResponse>.ErrorResponse($"Error al actualizar metadata: {ex.Message}");
             }
->>>>>>> 15998941304142dc5144d5f74b8ee48b369d7458
+        }
+
+        public async Task<ApiResponse<EncryptedVideoDataResponse>> GetEncryptedVideoDataAsync(int videoId)
+        {
+            try
+            {
+                Console.WriteLine($"[VideoService] Obteniendo video cifrado - VideoId: {videoId}");
+                
+                // 1. Obtener video de la base de datos
+                var video = await _context.Videos
+                    .FirstOrDefaultAsync(v => v.IdVideo == videoId);
+
+                if (video == null)
+                {
+                    Console.WriteLine($"[VideoService] Video {videoId} no encontrado en la base de datos");
+                    return ApiResponse<EncryptedVideoDataResponse>.ErrorResponse("Video no encontrado");
+                }
+
+                Console.WriteLine($"[VideoService] Video encontrado: {video.TituloVideo}");
+                Console.WriteLine($"[VideoService] RutaAlmacenamiento: {video.RutaAlmacenamiento}");
+                Console.WriteLine($"[VideoService] _videosPath: {_videosPath}");
+
+                // 2. Verificar que el archivo cifrado existe
+                // IMPORTANTE: RutaAlmacenamiento puede ser ruta completa o solo nombre de archivo
+                string encryptedFilePath;
+                if (Path.IsPathRooted(video.RutaAlmacenamiento) || video.RutaAlmacenamiento.StartsWith("./") || video.RutaAlmacenamiento.StartsWith(".\\"))
+                {
+                    // RutaAlmacenamiento ya es una ruta completa o relativa
+                    encryptedFilePath = video.RutaAlmacenamiento;
+                    Console.WriteLine($"[VideoService] RutaAlmacenamiento es ruta completa/relativa");
+                }
+                else
+                {
+                    // RutaAlmacenamiento es solo el nombre del archivo
+                    encryptedFilePath = Path.Combine(_videosPath, video.RutaAlmacenamiento);
+                    Console.WriteLine($"[VideoService] RutaAlmacenamiento es nombre de archivo, combinando con _videosPath");
+                }
+                
+                Console.WriteLine($"[VideoService] Ruta completa del archivo: {encryptedFilePath}");
+                Console.WriteLine($"[VideoService] Archivo existe: {File.Exists(encryptedFilePath)}");
+
+                if (!File.Exists(encryptedFilePath))
+                {
+                    // Listar archivos en el directorio para debugging
+                    if (Directory.Exists(_videosPath))
+                    {
+                        var files = Directory.GetFiles(_videosPath);
+                        Console.WriteLine($"[VideoService] Archivos en {_videosPath}:");
+                        foreach (var file in files)
+                        {
+                            Console.WriteLine($"  - {Path.GetFileName(file)}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[VideoService] El directorio {_videosPath} no existe");
+                    }
+
+                    return ApiResponse<EncryptedVideoDataResponse>.ErrorResponse("Archivo de video no encontrado");
+                }
+
+                // 3. Leer datos del archivo cifrado
+                var encryptedBytes = await File.ReadAllBytesAsync(encryptedFilePath);
+
+                // 4. Leer nonce y auth tag del archivo metadata
+                var metadataPath = encryptedFilePath + ".metadata";
+                if (!File.Exists(metadataPath))
+                {
+                    return ApiResponse<EncryptedVideoDataResponse>.ErrorResponse("Metadata del video no encontrada");
+                }
+
+                var metadata = await File.ReadAllTextAsync(metadataPath);
+                var metadataLines = metadata.Split('\n');
+                
+                string nonceBase64 = string.Empty;
+                string authTagBase64 = string.Empty;
+
+                foreach (var line in metadataLines)
+                {
+                    if (line.StartsWith("Nonce:"))
+                    {
+                        nonceBase64 = line.Replace("Nonce:", "").Trim();
+                    }
+                    else if (line.StartsWith("AuthTag:"))
+                    {
+                        authTagBase64 = line.Replace("AuthTag:", "").Trim();
+                    }
+                }
+
+                if (string.IsNullOrEmpty(nonceBase64) || string.IsNullOrEmpty(authTagBase64))
+                {
+                    return ApiResponse<EncryptedVideoDataResponse>.ErrorResponse("Metadata incompleta");
+                }
+
+                // 5. Crear respuesta
+                var response = new EncryptedVideoDataResponse
+                {
+                    Ciphertext = Convert.ToBase64String(encryptedBytes),
+                    Nonce = nonceBase64,
+                    AuthTag = authTagBase64,
+                    OriginalSize = video.TamañoArchivo,
+                    Format = video.FormatoVideo ?? "mp4"
+                };
+
+                return ApiResponse<EncryptedVideoDataResponse>.SuccessResponse(response, "Video cifrado obtenido correctamente");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<EncryptedVideoDataResponse>.ErrorResponse($"Error al obtener video cifrado: {ex.Message}");
+            }
+        }
+
+        public async Task<DecryptedVideoStreamResponse> GetDecryptedVideoStreamAsync(int videoId, int userId)
+        {
+            try
+            {
+                // 1. Verificar que el usuario existe
+                var user = await _context.Usuarios.FindAsync(userId);
+                if (user == null)
+                {
+                    throw new UnauthorizedAccessException("Usuario no encontrado");
+                }
+
+                // 2. Obtener el video de la base de datos
+                var video = await _context.Videos
+                    .FirstOrDefaultAsync(v => v.IdVideo == videoId);
+
+                if (video == null)
+                {
+                    throw new FileNotFoundException("Video no encontrado");
+                }
+
+                if (video.EstadoProcesamiento != "Disponible")
+                {
+                    throw new InvalidOperationException("El video no está disponible");
+                }
+
+                // 3. Verificar permisos del usuario para ver el video
+                Console.WriteLine($"[VideoService] Verificando permisos - UserId: {userId}, VideoId: {videoId}");
+                Console.WriteLine($"[VideoService] TipoUsuario: {user.TipoUsuario}, IdAdministrador del video: {video.IdAdministrador}");
+                
+                // Si el usuario es administrador y es dueño del video, tiene acceso
+                if (user.TipoUsuario == "Administrador" && video.IdAdministrador == userId)
+                {
+                    Console.WriteLine($"[VideoService] ✓ Acceso concedido: Administrador dueño del video");
+                }
+                // Si NO es administrador dueño, verificar permisos explícitos (aplica para consumidores y usuarios normales)
+                else
+                {
+                    var permission = await _context.Permisos
+                        .FirstOrDefaultAsync(p => p.IdUsuario == userId && p.IdVideo == videoId);
+                    
+                    if (permission == null)
+                    {
+                        Console.WriteLine($"[VideoService] ✗ No existe permiso para este usuario y video");
+                        throw new UnauthorizedAccessException("No tienes permiso para ver este video");
+                    }
+                    
+                    Console.WriteLine($"[VideoService] Permiso encontrado - TipoPermiso: {permission.TipoPermiso}");
+                    
+                    // Verificar que el permiso no esté revocado
+                    if (permission.TipoPermiso == "Revocado")
+                    {
+                        Console.WriteLine($"[VideoService] ✗ Permiso revocado");
+                        throw new UnauthorizedAccessException("Tu permiso para ver este video ha sido revocado");
+                    }
+                    
+                    // Verificar que el permiso esté aprobado (si aplica el sistema de aprobación)
+                    if (permission.TipoPermiso == "Pendiente")
+                    {
+                        Console.WriteLine($"[VideoService] ✗ Permiso pendiente de aprobación");
+                        throw new UnauthorizedAccessException("Tu permiso está pendiente de aprobación");
+                    }
+                    
+                    // Verificar si ha expirado
+                    if (permission.FechaExpiracion.HasValue && permission.FechaExpiracion.Value < DateTime.UtcNow)
+                    {
+                        Console.WriteLine($"[VideoService] ✗ Permiso expirado");
+                        throw new UnauthorizedAccessException("Tu permiso ha expirado");
+                    }
+                    
+                    // Verificar límite de accesos
+                    if (permission.MaxAccesos.HasValue && permission.NumeroAccesos >= permission.MaxAccesos.Value)
+                    {
+                        Console.WriteLine($"[VideoService] ✗ Límite de accesos alcanzado");
+                        throw new UnauthorizedAccessException("Has alcanzado el límite de accesos permitidos");
+                    }
+                    
+                    Console.WriteLine($"[VideoService] ✓ Acceso concedido: Usuario con permiso válido ({user.TipoUsuario})");
+                    
+                    // Actualizar contador de accesos y última fecha de acceso
+                    permission.NumeroAccesos++;
+                    permission.UltimoAcceso = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                }
+
+                // 4. Obtener los datos criptográficos del video
+                var cryptoData = await _context.DatosCriptograficosVideos
+                    .FirstOrDefaultAsync(c => c.IdVideo == videoId);
+
+                if (cryptoData == null)
+                {
+                    throw new InvalidOperationException("Datos criptográficos no encontrados");
+                }
+
+                // 5. Determinar la ruta completa del archivo cifrado
+                string encryptedFilePath;
+                if (Path.IsPathRooted(video.RutaAlmacenamiento) || 
+                    video.RutaAlmacenamiento.StartsWith("./") || 
+                    video.RutaAlmacenamiento.StartsWith(".\\"))
+                {
+                    encryptedFilePath = video.RutaAlmacenamiento;
+                }
+                else
+                {
+                    encryptedFilePath = Path.Combine(_videosPath, video.RutaAlmacenamiento);
+                }
+
+                if (!File.Exists(encryptedFilePath))
+                {
+                    throw new FileNotFoundException($"Archivo cifrado no encontrado: {encryptedFilePath}");
+                }
+
+                // 6. Leer el video cifrado
+                var encryptedBytes = await File.ReadAllBytesAsync(encryptedFilePath);
+
+                // 7. Obtener la clave privada del servidor para descifrar la KEK
+                var serverPrivateKey = _keyManagementService.GetServerPrivateKey();
+
+                // 8. Descifrar la KEK (Key Encryption Key) usando RSA
+                byte[] kek = _rsaService.Decrypt(cryptoData.KEKCifrada, serverPrivateKey);
+
+                // 9. Descifrar el video usando ChaCha20-Poly1305 con la KEK
+                byte[] decryptedBytes = _chaCha20Service.Decrypt(
+                    encryptedBytes,
+                    kek,
+                    cryptoData.Nonce,
+                    cryptoData.AuthTag,
+                    cryptoData.AAD
+                );
+
+                // 10. Crear stream con los datos descifrados
+                var memoryStream = new MemoryStream(decryptedBytes);
+
+                // 11. Retornar la respuesta con el stream descifrado
+                return new DecryptedVideoStreamResponse
+                {
+                    Stream = memoryStream,
+                    ContentType = $"video/{video.FormatoVideo ?? "mp4"}",
+                    Length = decryptedBytes.Length
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Error al desencriptar el video: {ex.Message}", ex);
+            }
         }
     }
 }

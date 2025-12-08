@@ -9,5 +9,6 @@ namespace SecureVideoStreaming.Services.Business.Interfaces
         Task<IEnumerable<UserResponse>> GetAllUsersAsync();
         Task<UserResponse> UpdateUserAsync(int userId, UpdateUserRequest request);
         Task<bool> DeleteUserAsync(int userId);
+        Task<ApiResponse<bool>> UpdatePublicKeyAsync(int userId, string publicKey, string fingerprint);
     }
 }

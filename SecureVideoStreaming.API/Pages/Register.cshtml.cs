@@ -33,6 +33,9 @@ namespace SecureVideoStreaming.API.Pages
         [Required(ErrorMessage = "Debe seleccionar un tipo de usuario")]
         public string UserType { get; set; } = "Usuario";
 
+        [BindProperty]
+        public string? PublicKeyRSA { get; set; }
+
         public string? ErrorMessage { get; set; }
         public string? SuccessMessage { get; set; }
 
@@ -60,12 +63,20 @@ namespace SecureVideoStreaming.API.Pages
 
             try
             {
+                // Validar que si es Usuario (consumidor), debe tener clave pública
+                if (UserType == "Usuario" && string.IsNullOrWhiteSpace(PublicKeyRSA))
+                {
+                    ErrorMessage = "Error al generar claves RSA. Por favor, intenta nuevamente.";
+                    return Page();
+                }
+
                 var request = new RegisterUserRequest
                 {
                     NombreUsuario = Username,
                     Email = Email,
                     Password = Password,
-                    TipoUsuario = UserType
+                    TipoUsuario = UserType,
+                    ClavePublicaRSA = PublicKeyRSA // Incluir clave pública si es consumidor
                 };
 
                 var response = await _authService.RegisterAsync(request);

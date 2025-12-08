@@ -12,5 +12,7 @@ namespace SecureVideoStreaming.Services.Business.Interfaces
         Task<ApiResponse<bool>> DeleteVideoAsync(int videoId, int adminId);
         Task<ApiResponse<VideoIntegrityResponse>> VerifyVideoIntegrityAsync(int videoId, int adminId);
         Task<ApiResponse<VideoResponse>> UpdateVideoMetadataAsync(int videoId, UpdateVideoMetadataRequest request, int adminId);
+        Task<ApiResponse<EncryptedVideoDataResponse>> GetEncryptedVideoDataAsync(int videoId);
+        Task<DecryptedVideoStreamResponse> GetDecryptedVideoStreamAsync(int videoId, int userId);
     }
 }

@@ -275,5 +275,38 @@ namespace SecureVideoStreaming.API.Controllers
                 return StatusCode(500, new { message = "Error al eliminar video" });
             }
         }
+
+        /// <summary>
+        /// Stream de video descifrado (servidor descifra y envía)
+        /// </summary>
+        [HttpGet("{id}/stream")]
+        public async Task<IActionResult> StreamDecryptedVideo(int id)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+                {
+                    return Unauthorized(new { message = "Token inválido" });
+                }
+
+                var result = await _videoService.GetDecryptedVideoStreamAsync(id, userId);
+                
+                return File(result.Stream, "video/mp4", enableRangeProcessing: true);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al hacer streaming del video {VideoId}", id);
+                return StatusCode(500, new { message = "Error al reproducir video" });
+            }
+        }
     }
 }

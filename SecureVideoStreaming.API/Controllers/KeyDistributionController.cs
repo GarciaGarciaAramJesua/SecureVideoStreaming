@@ -1,9 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-<<<<<<< HEAD
-=======
 using SecureVideoStreaming.Models.DTOs.Request;
->>>>>>> 15998941304142dc5144d5f74b8ee48b369d7458
 using SecureVideoStreaming.Services.Business.Interfaces;
 using System.Security.Claims;
 
@@ -14,16 +11,6 @@ namespace SecureVideoStreaming.API.Controllers
     [Authorize]
     public class KeyDistributionController : ControllerBase
     {
-<<<<<<< HEAD
-        private readonly IKeyDistributionService _keyDistributionService;
-        private readonly ILogger<KeyDistributionController> _logger;
-
-        public KeyDistributionController(
-            IKeyDistributionService keyDistributionService,
-            ILogger<KeyDistributionController> logger)
-        {
-            _keyDistributionService = keyDistributionService;
-=======
         private readonly IPermissionService _permissionService;
         private readonly IKeyDistributionService _keyDistributionService;
         private readonly IVideoStreamingService _videoStreamingService;
@@ -38,72 +25,10 @@ namespace SecureVideoStreaming.API.Controllers
             _permissionService = permissionService;
             _keyDistributionService = keyDistributionService;
             _videoStreamingService = videoStreamingService;
->>>>>>> 15998941304142dc5144d5f74b8ee48b369d7458
             _logger = logger;
         }
 
         /// <summary>
-<<<<<<< HEAD
-        /// Solicitar distribución de claves para un video
-        /// El usuario debe tener permiso activo para el video
-        /// </summary>
-        [HttpGet("request/{videoId}")]
-        public async Task<IActionResult> RequestKeys(int videoId)
-        {
-            try
-            {
-                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
-                {
-                    return Unauthorized(new { message = "Token inválido" });
-                }
-
-                var response = await _keyDistributionService.DistributeKeysAsync(videoId, userId);
-
-                if (!response.Success)
-                {
-                    _logger.LogWarning(
-                        "Solicitud de claves fallida - Video: {VideoId}, Usuario: {UserId}, Motivo: {Message}",
-                        videoId, userId, response.Message);
-                    return BadRequest(response);
-                }
-
-                _logger.LogInformation(
-                    "Claves distribuidas exitosamente - Video: {VideoId}, Usuario: {UserId}",
-                    videoId, userId);
-
-                return Ok(response);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al distribuir claves para video {VideoId}", videoId);
-                return StatusCode(500, new { message = "Error al distribuir claves" });
-            }
-        }
-
-        /// <summary>
-        /// Validar si un usuario puede solicitar claves para un video
-        /// </summary>
-        [HttpGet("validate/{videoId}")]
-        public async Task<IActionResult> ValidateKeyRequest(int videoId)
-        {
-            try
-            {
-                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
-                {
-                    return Unauthorized(new { message = "Token inválido" });
-                }
-
-                var response = await _keyDistributionService.ValidateKeyDistributionAsync(videoId, userId);
-                return Ok(response);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al validar solicitud de claves para video {VideoId}", videoId);
-                return StatusCode(500, new { message = "Error al validar solicitud" });
-            }
-=======
         /// Solicitar acceso a un video
         /// </summary>
         [HttpPost("request-access")]
@@ -239,7 +164,6 @@ namespace SecureVideoStreaming.API.Controllers
                 return BadRequest(result);
 
             return Ok(result);
->>>>>>> 15998941304142dc5144d5f74b8ee48b369d7458
         }
     }
 }

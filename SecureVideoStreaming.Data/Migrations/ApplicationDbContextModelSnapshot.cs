@@ -166,6 +166,12 @@ namespace SecureVideoStreaming.Data.Migrations
                     b.Property<int>("IdVideo")
                         .HasColumnType("int");
 
+                    b.Property<string>("Justificacion")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("MaxAccesos")
+                        .HasColumnType("int");
+
                     b.Property<int>("NumeroAccesos")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -243,6 +249,9 @@ namespace SecureVideoStreaming.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("varbinary(64)");
+
+                    b.Property<string>("PublicKeyFingerprint")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<byte[]>("Salt")
                         .IsRequired()

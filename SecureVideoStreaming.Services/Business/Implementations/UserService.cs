@@ -122,5 +122,30 @@ namespace SecureVideoStreaming.Services.Business.Implementations
 
             return true;
         }
+
+        public async Task<ApiResponse<bool>> UpdatePublicKeyAsync(int userId, string publicKey, string fingerprint)
+        {
+            try
+            {
+                var user = await _context.Usuarios.FindAsync(userId);
+
+                if (user == null || !user.Activo)
+                {
+                    return ApiResponse<bool>.ErrorResponse("Usuario no encontrado");
+                }
+
+                // Actualizar clave pública y fingerprint
+                user.ClavePublicaRSA = publicKey;
+                user.PublicKeyFingerprint = fingerprint;
+
+                await _context.SaveChangesAsync();
+
+                return ApiResponse<bool>.SuccessResponse(true, "Clave pública registrada exitosamente");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<bool>.ErrorResponse($"Error al actualizar clave pública: {ex.Message}");
+            }
+        }
     }
 }

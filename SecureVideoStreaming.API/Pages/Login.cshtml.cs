@@ -66,7 +66,8 @@ namespace SecureVideoStreaming.API.Pages
                 HttpContext.Session.SetString("UserType", response.UserType ?? "");
                 HttpContext.Session.SetInt32("UserId", response.UserId);
 
-                return RedirectToPage("/Home");
+                // Redirigir a página intermedia que verifica configuración de claves
+                return RedirectToPage("/LoginRedirect");
             }
             catch (Exception ex)
             {

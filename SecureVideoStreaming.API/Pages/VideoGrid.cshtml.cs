@@ -43,15 +43,8 @@ namespace SecureVideoStreaming.API.Pages
                     return RedirectToPage("/Login");
                 }
 
-                // Verificar que es Owner (Administrador)
+                // Obtener tipo de usuario (tanto Admin como Usuario pueden acceder)
                 var userType = HttpContext.Session.GetString("UserType");
-                if (userType != "Owner")
-                {
-                    _logger.LogWarning("Usuario Consumer intentó acceder al grid. Redirigiendo a Home");
-                    TempData["ErrorMessage"] = "Solo los administradores pueden acceder a la galería de videos";
-                    return RedirectToPage("/Home");
-                }
-
                 int userId = userIdSession.Value;
 
                 // Si hay filtros, usar búsqueda filtrada
@@ -108,6 +101,58 @@ namespace SecureVideoStreaming.API.Pages
                 TempData["ErrorMessage"] = "Error al cargar la galería de videos. Por favor, intenta nuevamente.";
                 Videos = new List<VideoGridItemResponse>();
                 return Page();
+            }
+        }
+
+        /// <summary>
+        /// Handler para obtener detalles de un video específico (AJAX)
+        /// </summary>
+        public async Task<IActionResult> OnGetVideoDetailsAsync(int videoId)
+        {
+            try
+            {
+                // Verificar autenticación mediante sesión
+                var userIdSession = HttpContext.Session.GetInt32("UserId");
+                if (!userIdSession.HasValue)
+                {
+                    return new JsonResult(new
+                    {
+                        success = false,
+                        message = "No autenticado"
+                    })
+                    { StatusCode = 401 };
+                }
+
+                int userId = userIdSession.Value;
+
+                // Obtener detalles del video
+                var response = await _videoGridService.GetVideoGridItemAsync(videoId, userId);
+
+                if (!response.Success)
+                {
+                    return new JsonResult(new
+                    {
+                        success = false,
+                        message = response.Message
+                    })
+                    { StatusCode = 404 };
+                }
+
+                return new JsonResult(new
+                {
+                    success = true,
+                    data = response.Data
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener detalles del video {VideoId}", videoId);
+                return new JsonResult(new
+                {
+                    success = false,
+                    message = "Error al cargar detalles del video"
+                })
+                { StatusCode = 500 };
             }
         }
     }

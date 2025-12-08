@@ -84,3 +84,10 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <!-- Solo se requiere rsa-crypto.js para generar clave pública -->
+    <!-- key-storage.js YA NO ES NECESARIO (modelo de claves efímeras) -->
+    <script src="~/js/rsa-crypto.js?v=2.0"></script>
+    <script src="~/js/register.js?v=2.0"></script>
+}

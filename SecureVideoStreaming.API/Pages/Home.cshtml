@@ -22,13 +22,106 @@
         </div>
     </div>
 
-    <!-- Botón de subir video (solo para admins) -->
+    <!-- Estadísticas para Administradores -->
     @if (Model.IsAdmin)
     {
         <div class="row mb-4">
-            <div class="col">
-                <a asp-page="/UploadVideo" class="btn btn-success btn-lg">
-                    <i class="bi bi-cloud-upload"></i> Subir Nuevo Video
+            <div class="col-md-3">
+                <div class="card text-bg-primary">
+                    <div class="card-body text-center">
+                        <i class="bi bi-film fs-1"></i>
+                        <h3 class="mt-2">@Model.TotalVideos</h3>
+                        <small>Videos Propios</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-bg-success">
+                    <div class="card-body text-center">
+                        <i class="bi bi-key fs-1"></i>
+                        <h3 class="mt-2">@Model.TotalPermisosActivos</h3>
+                        <small>Permisos Activos</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-bg-info">
+                    <div class="card-body text-center">
+                        <i class="bi bi-hdd-stack fs-1"></i>
+                        <h3 class="mt-2">@FormatFileSize(Model.AlmacenamientoUsado)</h3>
+                        <small>Almacenamiento</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-bg-warning">
+                    <div class="card-body text-center">
+                        <i class="bi bi-calendar-check fs-1"></i>
+                        <h3 class="mt-2">@Model.VideosSubidosHoy</h3>
+                        <small>Subidos Hoy</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Acciones rápidas de administrador -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <a asp-page="/UploadVideo" class="btn btn-success w-100 btn-lg">
+                    <i class="bi bi-cloud-upload"></i> Subir Video
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a asp-page="/MyVideos" class="btn btn-primary w-100 btn-lg">
+                    <i class="bi bi-collection-play"></i> Mis Videos
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a asp-page="/ManagePermissions" class="btn btn-info w-100 btn-lg">
+                    <i class="bi bi-shield-check"></i> Gestionar Permisos
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a asp-page="/IntegrityCheck" class="btn btn-warning w-100 btn-lg">
+                    <i class="bi bi-shield-exclamation"></i> Verificar Integridad
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Estadísticas para Consumidores -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card text-bg-success">
+                    <div class="card-body text-center">
+                        <i class="bi bi-unlock fs-1"></i>
+                        <h3 class="mt-2">@Model.PermisosDisponibles</h3>
+                        <small>Permisos Disponibles</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card text-bg-danger">
+                    <div class="card-body text-center">
+                        <i class="bi bi-lock fs-1"></i>
+                        <h3 class="mt-2">@Model.PermisosExpirados</h3>
+                        <small>Permisos Expirados</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Acciones rápidas de consumidor -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <a asp-page="/VideoGrid" class="btn btn-primary w-100 btn-lg">
+                    <i class="bi bi-grid-3x3-gap"></i> Explorar Videos
+                </a>
+            </div>
+            <div class="col-md-6">
+                <a asp-page="/MyPermissions" class="btn btn-info w-100 btn-lg">
+                    <i class="bi bi-key"></i> Mis Permisos
                 </a>
             </div>
         </div>
@@ -109,9 +202,9 @@
                             }
                             else
                             {
-                                <button class="btn btn-primary btn-sm" disabled>
+                                <a asp-page="/VideoPlayer" asp-route-id="@video.IdVideo" class="btn btn-primary btn-sm">
                                     <i class="bi bi-play-fill"></i> Ver Video
-                                </button>
+                                </a>
                             }
                         </div>
                     </div>

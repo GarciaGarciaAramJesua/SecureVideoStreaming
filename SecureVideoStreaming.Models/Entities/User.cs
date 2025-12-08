@@ -15,6 +15,7 @@ namespace SecureVideoStreaming.Models.Entities
         public byte[] PasswordHash { get; set; } = Array.Empty<byte>();
         public byte[] Salt { get; set; } = Array.Empty<byte>();
         public string ClavePublicaRSA { get; set; } = string.Empty;
+        public string? PublicKeyFingerprint { get; set; }
         
         // Metadata
         public DateTime FechaRegistro { get; set; } = DateTime.UtcNow;

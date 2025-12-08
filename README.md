@@ -2,15 +2,16 @@
 
 ## 🎯 Proyecto de Criptografía Aplicada
 
-### 📅 Última Actualización: 23 de Noviembre de 2025
+### 📅 Última Actualización: 8 de Diciembre de 2025
 ### 👥 Autores
 - **García García Aram Jesua**
 - **Hernández Díaz Roberto Angel**
 
 ### 📊 Estado del Proyecto
-- **Progreso:** 90% Completo
-- **Módulos Funcionales:** 10/11
-- **Última Entrega:** Entregable 2 - Permissions, Grid y Key Distribution ✅
+- **Progreso:** 100% Completo ✅
+- **Módulos Funcionales:** 11/11
+- **Modelo de Seguridad:** Claves Efímeras (Ephemeral Keys)
+- **Última Mejora:** Implementación de claves temporales sin persistencia
 
 ---
 
@@ -81,7 +82,7 @@ SecureVideoStreaming/
 6. **Videos Encryption** - ChaCha20-Poly1305 AEAD
 7. **Owner Management** - CRUD de videos del admin
 
-### ✅ Entregable 2 (Completado) 🆕
+### ✅ Entregable 2 (Completado)
 8. **Permissions Module** - Control de acceso granular
    - Otorgar/revocar permisos
    - Permisos permanentes y temporales
@@ -98,8 +99,28 @@ SecureVideoStreaming/
     - Persistencia de claves del servidor
     - Auditoría completa
 
-### ⏳ Próximo Entregable
-11. **Download/Stream Module** - Descarga y reproducción segura
+11. **Download/Stream Module** - Reproducción segura ✅
+    - Streaming con descifrado en tiempo real
+    - Modelo de claves efímeras (sin persistencia)
+    - Auto-destrucción de claves temporales
+    - Zero-storage security model
+
+---
+
+## 📚 Documentación del Proyecto
+
+El proyecto cuenta con documentación completa organizada en los siguientes archivos:
+
+| Documento | Descripción |
+|-----------|-------------|
+| `README.md` | Este archivo - Guía general del proyecto |
+| `ARQUITECTURA.md` | Arquitectura completa del sistema incluyendo modelo de claves efímeras |
+| `MIGRACION_CLAVES_EFIMERAS.md` | Documentación de la migración a claves temporales |
+| `MIGRACION_BD.md` | Guía de migraciones de base de datos |
+| `LIMPIAR_CACHE.md` | Instrucciones para limpiar caché del navegador |
+| `OTORGAR_PERMISOS_SQL.md` | Scripts SQL para permisos de base de datos |
+| `PRUEBAS.md` | Documentación de pruebas del sistema |
+| `TODO.md` | Lista de tareas y pendientes |
 
 ---
 
@@ -180,9 +201,82 @@ http://localhost:5140/swagger
 
 ---
 
-## 7. Próximos Pasos (Semana 2)
+## 7. 🔐 Modelo de Seguridad - Claves Efímeras
 
-- Implementar módulo de registro de usuarios
-- Sistema de autenticación con JWT
-- Gestión de claves RSA por usuario
-- Endpoints de usuarios (Owner/Consumer)
+### Características Principales
+- **Zero-Storage**: No se almacenan claves privadas en ningún medio persistente
+- **Zero-Persistence**: No se usa localStorage ni sessionStorage
+- **Auto-Destruction**: Las claves se destruyen automáticamente al cerrar el video
+- **RAM-Only**: Las claves temporales solo existen en memoria durante la reproducción
+
+### Flujo de Seguridad
+1. Usuario solicita ver un video
+2. Se generan claves RSA-2048 temporales en RAM (Web Crypto API)
+3. Servidor cifra la clave de video con la clave pública temporal
+4. Cliente descifra en memoria y reproduce el video
+5. Al cerrar el video, las claves se destruyen automáticamente
+
+### Beneficios de Seguridad
+✅ Elimina riesgo de robo de claves privadas almacenadas  
+✅ No hay archivos descargables que comprometan la seguridad  
+✅ Mejor experiencia de usuario (sin backups manuales)  
+✅ Cumple con principio de "least privilege"  
+✅ Auto-limpieza garantizada por garbage collector
+
+---
+
+## 8. 🚀 Inicio Rápido
+
+```bash
+# 1. Restaurar dependencias
+dotnet restore
+
+# 2. Aplicar migraciones
+dotnet ef database update --project SecureVideoStreaming.Data --startup-project SecureVideoStreaming.API
+
+# 3. Ejecutar proyecto
+cd SecureVideoStreaming.API
+dotnet run
+
+# 4. Abrir en navegador
+# https://localhost:7217
+```
+
+### Primera Vez
+1. Navega a `/Register`
+2. Crea un usuario tipo "Administrador" para subir videos
+3. Crea un usuario tipo "Usuario" para ver videos
+4. El administrador sube videos y otorga permisos
+5. El usuario ve videos con claves efímeras
+
+---
+
+## 9. ⚠️ Solución de Problemas
+
+### Error: "SecureKeyStorage is not defined"
+Este error indica caché del navegador. **Solución**:
+- Presiona `Ctrl + Shift + R` (Windows/Linux) o `Cmd + Shift + R` (Mac)
+- Consulta `LIMPIAR_CACHE.md` para más detalles
+
+### Error de Base de Datos
+```bash
+dotnet ef database drop --project SecureVideoStreaming.Data --startup-project SecureVideoStreaming.API
+dotnet ef database update --project SecureVideoStreaming.Data --startup-project SecureVideoStreaming.API
+```
+
+### Permisos SQL Server
+Consulta `OTORGAR_PERMISOS_SQL.md` para configurar permisos correctamente.
+
+---
+
+## 10. 📝 Licencia y Créditos
+
+**Proyecto Académico** - Universidad [Nombre]  
+**Materia**: Criptografía Aplicada  
+**Semestre**: Otoño 2025  
+
+**Tecnologías Clave**:
+- .NET 8.0, Entity Framework Core
+- ChaCha20-Poly1305, RSA-OAEP
+- Web Crypto API, BouncyCastle
+- SQL Server, JWT Authentication

@@ -1,0 +1,451 @@
+@page
+@model SecureVideoStreaming.API.Pages.ManagePermissionsModel
+@{
+    ViewData["Title"] = "Gestión de Permisos";
+}
+
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">
+                <i class="bi bi-key me-2"></i>Gestión de Permisos
+            </h2>
+            <p class="text-muted">Administra los permisos de acceso a tus videos para los usuarios consumidores</p>
+        </div>
+    </div>
+
+    <!-- Tabs de Navegación -->
+    <ul class="nav nav-tabs mb-4" id="permissionTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                <i class="bi bi-clock-history me-2"></i>Solicitudes Pendientes
+                @if (Model.PendingRequests.Any())
+                {
+                    <span class="badge bg-warning text-dark ms-2">@Model.PendingRequests.Count</span>
+                }
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="manage-tab" data-bs-toggle="tab" data-bs-target="#manage" type="button" role="tab">
+                <i class="bi bi-shield-check me-2"></i>Gestionar Permisos
+            </button>
+        </li>
+    </ul>
+
+    <!-- Mensajes de estado -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- Contenido de las Tabs -->
+    <div class="tab-content" id="permissionTabsContent">
+        <!-- Tab de Solicitudes Pendientes -->
+        <div class="tab-pane fade show active" id="pending" role="tabpanel">
+            @if (Model.PendingRequests.Any())
+            {
+                <div class="row">
+                    @foreach (var request in Model.PendingRequests)
+                    {
+                        <div class="col-lg-6 mb-4">
+                            <div class="card shadow-sm border-warning">
+                                <div class="card-header bg-warning bg-opacity-10">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h5 class="mb-1">
+                                                <i class="bi bi-camera-video me-2"></i>@request.TituloVideo
+                                            </h5>
+                                            <small class="text-muted">
+                                                <i class="bi bi-calendar me-1"></i>Solicitado el @request.FechaOtorgamiento.ToString("dd/MM/yyyy HH:mm")
+                                            </small>
+                                        </div>
+                                        <span class="badge bg-warning text-dark">Pendiente</span>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <h6 class="text-muted mb-2">
+                                            <i class="bi bi-person-circle me-1"></i>Usuario Solicitante
+                                        </h6>
+                                        <p class="mb-0"><strong>@request.NombreUsuario</strong></p>
+                                        <small class="text-muted">ID: @request.IdUsuario</small>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <h6 class="text-muted mb-2">
+                                            <i class="bi bi-chat-left-text me-1"></i>Justificación
+                                        </h6>
+                                        <p class="text-break">@request.Justificacion</p>
+                                    </div>
+
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-success flex-fill" 
+                                                onclick="showApproveModal(@request.IdPermiso, '@request.NombreUsuario', '@request.TituloVideo')">
+                                            <i class="bi bi-check-circle me-1"></i>Aprobar
+                                        </button>
+                                        <form method="post" asp-page-handler="RejectRequest" class="flex-fill">
+                                            <input type="hidden" name="permissionId" value="@request.IdPermiso" />
+                                            <button type="submit" class="btn btn-danger w-100" 
+                                                    onclick="return confirm('¿Estás seguro de rechazar esta solicitud?')">
+                                                <i class="bi bi-x-circle me-1"></i>Rechazar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-1 text-muted"></i>
+                    <h5 class="mt-3 text-muted">No hay solicitudes pendientes</h5>
+                    <p class="text-muted">Todas las solicitudes han sido procesadas</p>
+                </div>
+            }
+        </div>
+
+        <!-- Tab de Gestionar Permisos -->
+        <div class="tab-pane fade" id="manage" role="tabpanel">
+            <div class="row">
+                <!-- Panel de Otorgar Permiso -->
+                <div class="col-lg-5 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-plus-circle me-2"></i>Otorgar Nuevo Permiso
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" asp-page-handler="GrantPermission">
+                        <div class="mb-3">
+                            <label for="SelectedVideoId" class="form-label">
+                                <i class="bi bi-camera-video me-1"></i>Seleccionar Video
+                            </label>
+                            <select class="form-select" id="SelectedVideoId" asp-for="SelectedVideoId" required onchange="this.form.submit()">
+                                <option value="">-- Seleccione un video --</option>
+                                @foreach (var video in Model.AdminVideos)
+                                {
+                                    <option value="@video.IdVideo" selected="@(video.IdVideo == Model.SelectedVideoId)">
+                                        @video.TituloVideo
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        @if (Model.SelectedVideoId > 0)
+                        {
+                            <div class="mb-3">
+                                <label for="SelectedUserId" class="form-label">
+                                    <i class="bi bi-person me-1"></i>Usuario Consumidor
+                                </label>
+                                <select class="form-select" id="SelectedUserId" asp-for="SelectedUserId" required>
+                                    <option value="">-- Seleccione un usuario --</option>
+                                    @foreach (var user in Model.ConsumerUsers)
+                                    {
+                                        <option value="@user.IdUsuario">
+                                            @user.NombreUsuario (@user.Email)
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="FechaExpiracion" class="form-label">
+                                    <i class="bi bi-calendar-event me-1"></i>Fecha de Expiración (Opcional)
+                                </label>
+                                <input type="datetime-local" class="form-control" id="FechaExpiracion" asp-for="FechaExpiracion" />
+                                <small class="text-muted">Si se deja vacío, el permiso no expirará</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="LimiteAccesos" class="form-label">
+                                    <i class="bi bi-hash me-1"></i>Límite de Accesos (Opcional)
+                                </label>
+                                <input type="number" class="form-control" id="LimiteAccesos" asp-for="LimiteAccesos" min="1" />
+                                <small class="text-muted">Si se deja vacío, no habrá límite de accesos</small>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-shield-check me-1"></i>Otorgar Permiso
+                            </button>
+                        }
+                    </form>
+                </div>
+            </div>
+
+            <!-- Estadísticas Rápidas -->
+            @if (Model.SelectedVideoId > 0)
+            {
+                <div class="card shadow-sm mt-3">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Estadísticas del Video</h6>
+                        <div class="d-flex justify-content-between">
+                            <span>Total de Permisos:</span>
+                            <span class="badge bg-primary">@Model.VideoPermissions.Count</span>
+                        </div>
+                        <div class="d-flex justify-content-between mt-2">
+                            <span>Permisos Activos:</span>
+                            <span class="badge bg-success">@Model.VideoPermissions.Count(p => p.EstaActivo)</span>
+                        </div>
+                        <div class="d-flex justify-content-between mt-2">
+                            <span>Permisos Expirados:</span>
+                            <span class="badge bg-danger">@Model.VideoPermissions.Count(p => !p.EstaActivo)</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Panel de Permisos Existentes -->
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-check me-2"></i>Permisos Existentes
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.SelectedVideoId > 0)
+                    {
+                        @if (Model.VideoPermissions.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th scope="col">Usuario</th>
+                                            <th scope="col">Estado</th>
+                                            <th scope="col">Expira</th>
+                                            <th scope="col">Accesos</th>
+                                            <th scope="col" class="text-center">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var permission in Model.VideoPermissions)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="bi bi-person-circle fs-4 text-primary me-2"></i>
+                                                        <div>
+                                                            <div class="fw-semibold">@permission.NombreUsuario</div>
+                                                            <small class="text-muted">ID: @permission.IdPermiso</small>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    @if (permission.EstaActivo)
+                                                    {
+                                                        <span class="badge bg-success">
+                                                            <i class="bi bi-check-circle me-1"></i>Activo
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-danger">
+                                                            <i class="bi bi-x-circle me-1"></i>Inactivo
+                                                        </span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (permission.FechaExpiracion.HasValue)
+                                                    {
+                                                        <small>@permission.FechaExpiracion.Value.ToString("dd/MM/yyyy")</small>
+                                                        <br />
+                                                        <small class="text-muted">@permission.FechaExpiracion.Value.ToString("HH:mm")</small>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">Sin límite</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (permission.AccesosRestantes.HasValue)
+                                                    {
+                                                        <span class="badge bg-info">
+                                                            @permission.NumeroAccesos accesos
+                                                        </span>
+                                                        <br />
+                                                        <small class="text-muted">Restantes: @permission.AccesosRestantes</small>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">
+                                                            @permission.NumeroAccesos
+                                                        </span>
+                                                    }
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        @if (permission.EstaActivo)
+                                                        {
+                                                            <button type="button" class="btn btn-outline-primary" 
+                                                                    title="Extender permiso"
+                                                                    onclick="showExtendModal(@permission.IdPermiso, '@permission.NombreUsuario')">
+                                                                <i class="bi bi-clock-history"></i>
+                                                            </button>
+                                                            <form method="post" asp-page-handler="RevokePermission" style="display: inline;">
+                                                                <input type="hidden" name="permissionId" value="@permission.IdPermiso" />
+                                                                <input type="hidden" asp-for="SelectedVideoId" value="@Model.SelectedVideoId" />
+                                                                <button type="submit" class="btn btn-outline-danger" 
+                                                                        title="Revocar permiso"
+                                                                        onclick="return confirm('¿Estás seguro de revocar este permiso?')">
+                                                                    <i class="bi bi-x-circle"></i>
+                                                                </button>
+                                                            </form>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-muted small">Permiso revocado</span>
+                                                        }
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center py-5">
+                                <i class="bi bi-shield-x display-1 text-muted"></i>
+                                <h5 class="mt-3 text-muted">No hay permisos otorgados</h5>
+                                <p class="text-muted">Este video aún no tiene permisos asignados</p>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-arrow-left-circle display-1 text-muted"></i>
+                            <h5 class="mt-3 text-muted">Selecciona un video</h5>
+                            <p class="text-muted">Elige un video del panel izquierdo para gestionar sus permisos</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Aprobar Solicitud -->
+<div class="modal fade" id="approveModal" tabindex="-1" aria-labelledby="approveModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="approveModalLabel">
+                    <i class="bi bi-check-circle me-2"></i>Aprobar Solicitud de Acceso
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" asp-page-handler="ApproveRequest">
+                <div class="modal-body">
+                    <p class="mb-1"><strong>Usuario:</strong> <span id="approveUserName"></span></p>
+                    <p class="mb-3"><strong>Video:</strong> <span id="approveVideoTitle"></span></p>
+                    <input type="hidden" id="approvePermissionId" name="permissionId" />
+                    
+                    <div class="mb-3">
+                        <label for="approveFechaExpiracion" class="form-label">
+                            <i class="bi bi-calendar-event me-1"></i>Fecha de Expiración (Opcional)
+                        </label>
+                        <input type="datetime-local" class="form-control" id="approveFechaExpiracion" name="fechaExpiracion" />
+                        <small class="text-muted">Si se deja vacío, el permiso no expirará</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="approveLimiteAccesos" class="form-label">
+                            <i class="bi bi-hash me-1"></i>Límite de Accesos (Opcional)
+                        </label>
+                        <input type="number" class="form-control" id="approveLimiteAccesos" name="limiteAccesos" min="1" />
+                        <small class="text-muted">Si se deja vacío, no habrá límite de accesos</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle me-1"></i>Aprobar Solicitud
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Extender Permiso -->
+<div class="modal fade" id="extendModal" tabindex="-1" aria-labelledby="extendModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="extendModalLabel">
+                    <i class="bi bi-clock-history me-2"></i>Extender Permiso
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" asp-page-handler="ExtendPermission">
+                <div class="modal-body">
+                    <p class="mb-3">Usuario: <strong id="extendUserName"></strong></p>
+                    <input type="hidden" id="extendPermissionId" name="permissionId" />
+                    <input type="hidden" asp-for="SelectedVideoId" value="@Model.SelectedVideoId" />
+                    
+                    <div class="mb-3">
+                        <label for="additionalDays" class="form-label">
+                            <i class="bi bi-calendar-plus me-1"></i>Días adicionales
+                        </label>
+                        <input type="number" class="form-control" id="additionalDays" name="additionalDays" 
+                               min="1" max="365" value="30" required />
+                        <small class="text-muted">Especifica cuántos días más tendrá acceso el usuario</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-1"></i>Extender Permiso
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function showApproveModal(permissionId, userName, videoTitle) {
+            document.getElementById('approvePermissionId').value = permissionId;
+            document.getElementById('approveUserName').textContent = userName;
+            document.getElementById('approveVideoTitle').textContent = videoTitle;
+            
+            var approveModal = new bootstrap.Modal(document.getElementById('approveModal'));
+            approveModal.show();
+        }
+
+        function showExtendModal(permissionId, userName) {
+            document.getElementById('extendPermissionId').value = permissionId;
+            document.getElementById('extendUserName').textContent = userName;
+            
+            var extendModal = new bootstrap.Modal(document.getElementById('extendModal'));
+            extendModal.show();
+        }
+    </script>
+}

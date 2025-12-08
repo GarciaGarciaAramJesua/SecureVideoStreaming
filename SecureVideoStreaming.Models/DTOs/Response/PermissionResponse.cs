@@ -16,6 +16,7 @@ namespace SecureVideoStreaming.Models.DTOs.Response
         public DateTime? FechaExpiracion { get; set; }
         public DateTime? FechaRevocacion { get; set; }
         public int NumeroAccesos { get; set; }
+        public int? AccesosRestantes { get; set; }
         public DateTime? UltimoAcceso { get; set; }
         public int OtorgadoPor { get; set; }
         public string NombreOtorgante { get; set; } = string.Empty;
@@ -23,5 +24,7 @@ namespace SecureVideoStreaming.Models.DTOs.Response
         public string? NombreRevocador { get; set; }
         public bool EstaActivo { get; set; }
         public bool EstaExpirado { get; set; }
+        public string? MensajeEstado { get; set; }
+        public string? Justificacion { get; set; }
     }
 }

@@ -103,5 +103,42 @@ namespace SecureVideoStreaming.API.Controllers
                 return StatusCode(500, new { message = "Error al obtener información del usuario" });
             }
         }
+
+        /// <summary>
+        /// Verificar token JWT y obtener claims (útil para debugging)
+        /// </summary>
+        [Authorize]
+        [HttpGet("verify-token")]
+        public IActionResult VerifyToken()
+        {
+            try
+            {
+                var claims = User.Claims.Select(c => new
+                {
+                    Type = c.Type,
+                    Value = c.Value
+                }).ToList();
+
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var email = User.FindFirst(ClaimTypes.Email)?.Value;
+                var name = User.FindFirst(ClaimTypes.Name)?.Value;
+                var role = User.FindFirst(ClaimTypes.Role)?.Value;
+
+                return Ok(new
+                {
+                    message = "Token válido",
+                    userId = userId,
+                    email = email,
+                    name = name,
+                    role = role,
+                    allClaims = claims
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al verificar token");
+                return StatusCode(500, new { message = "Error al verificar token" });
+            }
+        }
     }
 }

@@ -16,6 +16,7 @@ namespace SecureVideoStreaming.Models.Entities
         public int NumeroAccesos { get; set; } = 0;
         public int? MaxAccesos { get; set; } // Límite de accesos (null = ilimitado)
         public DateTime? UltimoAcceso { get; set; }
+        public string? Justificacion { get; set; } // Justificación de la solicitud de acceso
         
         // Otorgamiento y Revocación
         public int OtorgadoPor { get; set; }

@@ -49,7 +49,7 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                         : "El nombre de usuario ya está en uso");
             }
 
-            // 2. Generar salt
+            // 2. Generar salt para password
             var salt = _hashService.GenerateSalt(32);
 
             // 3. Derivar hash de contraseña con PBKDF2
@@ -59,8 +59,37 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                 iterations: 100000,
                 keyLength: 64);
 
-            // 4. Generar par de claves RSA
-            var (publicKey, privateKey) = _rsaService.GenerateKeyPair(2048);
+            // 4. Determinar clave pública RSA según tipo de usuario
+            string publicKey;
+            
+            if (request.TipoUsuario == "Usuario")
+            {
+                // CONSUMIDORES: Usan clave pública generada en el cliente
+                if (string.IsNullOrWhiteSpace(request.ClavePublicaRSA))
+                {
+                    throw new InvalidOperationException(
+                        "Los usuarios tipo 'Usuario' deben proporcionar su clave pública RSA generada en el cliente");
+                }
+                
+                // Validar formato PEM básico
+                if (!request.ClavePublicaRSA.Contains("-----BEGIN PUBLIC KEY-----"))
+                {
+                    throw new InvalidOperationException("El formato de la clave pública RSA es inválido");
+                }
+                
+                publicKey = request.ClavePublicaRSA;
+            }
+            else // Administrador
+            {
+                // ADMINISTRADORES: Generan claves en el servidor por seguridad adicional
+                // Las claves del servidor se usan para operaciones críticas de administración
+                var (serverPublicKey, serverPrivateKey) = _rsaService.GenerateKeyPair(4096);
+                publicKey = serverPublicKey;
+                
+                // NOTA: La clave privada del administrador NO se almacena en BD
+                // Solo se usa temporalmente para generar claves HMAC y se descarta
+                // Los administradores deben autenticarse con JWT para operaciones sensibles
+            }
 
             // 5. Crear usuario
             var user = new User

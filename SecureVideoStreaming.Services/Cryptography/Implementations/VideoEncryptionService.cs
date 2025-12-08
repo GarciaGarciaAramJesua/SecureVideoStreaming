@@ -90,6 +90,13 @@ namespace SecureVideoStreaming.Services.Cryptography.Implementations
                 hmacOfEncryptedVideo = _hmacService.ComputeHmac(encryptedStream, hmacKey);
             }
 
+            // 6. Guardar metadata (nonce y authTag) en archivo separado
+            var metadataPath = outputFilePath + ".metadata";
+            var metadataContent = $"Nonce:{Convert.ToBase64String(nonce)}\nAuthTag:{Convert.ToBase64String(authTag)}";
+            await File.WriteAllTextAsync(metadataPath, metadataContent);
+            
+            Console.WriteLine($"[VideoEncryptionService] Metadata guardada en: {metadataPath}");
+
             return new VideoEncryptionResult
             {
                 EncryptedKek = encryptedKek,

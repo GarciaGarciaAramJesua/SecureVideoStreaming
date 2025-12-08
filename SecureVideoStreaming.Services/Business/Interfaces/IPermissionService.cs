@@ -9,7 +9,6 @@ namespace SecureVideoStreaming.Services.Business.Interfaces
     public interface IPermissionService
     {
         /// <summary>
-<<<<<<< HEAD
         /// Otorgar permiso a un usuario para acceder a un video
         /// </summary>
         Task<ApiResponse<PermissionResponse>> GrantPermissionAsync(GrantPermissionRequest request);
@@ -45,10 +44,6 @@ namespace SecureVideoStreaming.Services.Business.Interfaces
         Task<ApiResponse<PermissionResponse>> GetPermissionByIdAsync(int permissionId);
 
         /// <summary>
-        /// Actualizar el contador de accesos de un permiso
-        /// </summary>
-        Task<ApiResponse<bool>> IncrementAccessCountAsync(int permissionId);
-=======
         /// Solicitar acceso a un video
         /// </summary>
         Task<ApiResponse<PermissionResponse>> RequestAccessAsync(int videoId, int userId, string justificacion);
@@ -92,6 +87,15 @@ namespace SecureVideoStreaming.Services.Business.Interfaces
         /// Incrementar contador de accesos
         /// </summary>
         Task IncrementAccessCountAsync(int permisoId);
->>>>>>> 15998941304142dc5144d5f74b8ee48b369d7458
+
+        /// <summary>
+        /// Obtener solicitudes pendientes de todos los videos del administrador
+        /// </summary>
+        Task<ApiResponse<List<PermissionResponse>>> GetPendingRequestsByAdminAsync(int adminId);
+
+        /// <summary>
+        /// Aprobar una solicitud de acceso pendiente
+        /// </summary>
+        Task<ApiResponse<PermissionResponse>> ApprovePermissionAsync(int permissionId, int adminId, DateTime? fechaExpiracion = null, int? limiteAccesos = null);
     }
 }

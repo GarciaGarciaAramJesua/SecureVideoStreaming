@@ -1,0 +1,78 @@
+@page
+@model SecureVideoStreaming.API.Pages.LoginRedirectModel
+@{
+    ViewData["Title"] = "Redirigiendo...";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>@ViewData["Title"]</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+    <div class="container">
+        <div class="row justify-content-center align-items-center min-vh-100">
+            <div class="col-md-6 text-center">
+                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <h4>Verificando configuración de seguridad...</h4>
+                <p class="text-muted">Por favor espera un momento</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="~/js/key-storage.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const userType = '@Model.UserType';
+            const token = '@Model.Token';
+            
+            console.log('🔄 LoginRedirect - Verificando tipo de usuario:', userType);
+            
+            // Guardar token JWT en localStorage para peticiones a la API
+            if (token && token !== '') {
+                localStorage.setItem('jwtToken', token);
+                console.log('✅ Token JWT guardado en localStorage');
+            } else {
+                console.warn('⚠️ No se recibió token JWT');
+            }
+
+            // Si es administrador, ir directo a Home
+            if (userType === 'Administrador') {
+                console.log('✅ Usuario administrador, redirigiendo a Home...');
+                window.location.href = '/Home';
+                return;
+            }
+
+            // Si es consumidor, verificar claves
+            if (userType === 'Usuario') {
+                const keyStorage = new SecureKeyStorage();
+                const hasKeys = keyStorage.hasPrivateKey();
+                
+                console.log('🔍 Verificando localStorage...');
+                console.log('  - encryptedPrivateKey:', localStorage.getItem('encryptedPrivateKey') ? 'EXISTS' : 'NULL');
+                console.log('  - publicKey:', localStorage.getItem('publicKey') ? 'EXISTS' : 'NULL');
+                console.log('  - publicKeyFingerprint:', localStorage.getItem('publicKeyFingerprint') ? 'EXISTS' : 'NULL');
+                console.log('  - hasPrivateKey():', hasKeys);
+                
+                if (!hasKeys) {
+                    console.log('⚠️ Consumidor sin claves, redirigiendo a SetupKeys...');
+                    setTimeout(() => { window.location.href = '/SetupKeys'; }, 500);
+                } else {
+                    console.log('✅ Consumidor con claves, redirigiendo a Home...');
+                    setTimeout(() => { window.location.href = '/Home'; }, 500);
+                }
+                return;
+            }
+
+            // Fallback: ir a Home
+            console.log('🔄 Tipo de usuario desconocido, redirigiendo a Home...');
+            window.location.href = '/Home';
+        });
+    </script>
+</body>
+</html>

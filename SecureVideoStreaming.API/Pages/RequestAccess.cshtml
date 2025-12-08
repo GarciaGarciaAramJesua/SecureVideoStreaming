@@ -1,0 +1,165 @@
+@page
+@model SecureVideoStreaming.API.Pages.RequestAccessModel
+@{
+    ViewData["Title"] = "Solicitar Acceso";
+}
+
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-page="/Home">Inicio</a></li>
+            <li class="breadcrumb-item"><a asp-page="/VideoGrid">Catálogo</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Solicitar Acceso</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Formulario de solicitud -->
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-key-fill me-2"></i>Solicitar Acceso a Video
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>@Model.ErrorMessage
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    @if (Model.Video != null)
+                    {
+                        <!-- Información del video -->
+                        <div class="mb-4">
+                            <h6 class="text-muted mb-3">Información del Video</h6>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <table class="table table-borderless mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <td width="150" class="fw-bold">Título:</td>
+                                                <td>@Model.Video.TituloVideo</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Descripción:</td>
+                                                <td>@Model.Video.Descripcion</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Administrador:</td>
+                                                <td>@Model.Video.NombreAdministrador</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Fecha de subida:</td>
+                                                <td>@Model.Video.FechaSubida.ToString("dd/MM/yyyy HH:mm")</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Tamaño:</td>
+                                                <td>@(Model.Video.TamañoArchivo / 1024 / 1024) MB</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr />
+
+                        <!-- Formulario de solicitud -->
+                        <form method="post">
+                            <input type="hidden" asp-for="VideoId" />
+                            
+                            <div class="mb-3">
+                                <label for="justification" class="form-label fw-bold">
+                                    Justificación de la solicitud <span class="text-danger">*</span>
+                                </label>
+                                <textarea 
+                                    class="form-control" 
+                                    id="justification" 
+                                    asp-for="Justification" 
+                                    rows="5" 
+                                    placeholder="Explique por qué necesita acceso a este video..."
+                                    required></textarea>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    La justificación será revisada por el administrador del video antes de aprobar el acceso.
+                                </div>
+                                <span asp-validation-for="Justification" class="text-danger"></span>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <a asp-page="/VideoGrid" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-left me-1"></i>Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-send-fill me-1"></i>Enviar Solicitud
+                                </button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel informativo -->
+        <div class="col-md-4">
+            <!-- Información del proceso -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-info-circle-fill me-2"></i>¿Cómo funciona?
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ol class="mb-0 ps-3">
+                        <li class="mb-2">
+                            <strong>Envías tu solicitud</strong>
+                            <p class="text-muted small mb-0">Proporciona una justificación clara de por qué necesitas acceso al video.</p>
+                        </li>
+                        <li class="mb-2">
+                            <strong>Revisión del administrador</strong>
+                            <p class="text-muted small mb-0">El administrador del video revisará tu solicitud y tu justificación.</p>
+                        </li>
+                        <li class="mb-2">
+                            <strong>Aprobación y acceso</strong>
+                            <p class="text-muted small mb-0">Si es aprobada, recibirás acceso al video con un permiso temporal o permanente.</p>
+                        </li>
+                        <li class="mb-0">
+                            <strong>Visualización segura</strong>
+                            <p class="text-muted small mb-0">Podrás ver el video de forma segura con descifrado en tiempo real.</p>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Consejos -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0">
+                        <i class="bi bi-lightbulb-fill me-2"></i>Consejos
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0 ps-3">
+                        <li class="mb-2 small">
+                            Sé específico en tu justificación
+                        </li>
+                        <li class="mb-2 small">
+                            Menciona el propósito del acceso (educativo, profesional, etc.)
+                        </li>
+                        <li class="mb-2 small">
+                            Incluye fechas o plazos si son relevantes
+                        </li>
+                        <li class="mb-0 small">
+                            Mantén un tono profesional y respetuoso
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

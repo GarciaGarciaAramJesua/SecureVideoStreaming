@@ -20,6 +20,9 @@ namespace SecureVideoStreaming.API.Extensions
             services.AddSingleton<IKeyManagementService, KeyManagementService>();
             services.AddSingleton<IKekService, KekService>();
             
+            // Servicio de cifrado de claves privadas del cliente
+            services.AddSingleton<IPrivateKeyEncryptionService, PrivateKeyEncryptionService>();
+            
             // Servicio de cifrado de videos
             services.AddSingleton<IVideoEncryptionService, VideoEncryptionService>();
 

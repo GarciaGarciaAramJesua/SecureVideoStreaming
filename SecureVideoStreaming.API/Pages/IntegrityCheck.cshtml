@@ -1,0 +1,297 @@
+@page
+@model SecureVideoStreaming.API.Pages.IntegrityCheckModel
+@{
+    ViewData["Title"] = "Verificación de Integridad";
+}
+
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">
+                <i class="bi bi-shield-check me-2"></i>Verificación de Integridad
+            </h2>
+            <p class="text-muted">Verifica la integridad de los videos cifrados para detectar posibles corrupciones o modificaciones no autorizadas</p>
+        </div>
+    </div>
+
+    <!-- Mensajes de estado -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row">
+        <!-- Panel de Verificación -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-play-circle me-2"></i>Iniciar Verificación
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" asp-page-handler="CheckIntegrity">
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-camera-video me-1"></i>Modo de Verificación
+                            </label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="verificationMode" id="singleMode" 
+                                       value="single" checked onchange="toggleVideoSelection()">
+                                <label class="form-check-label" for="singleMode">
+                                    Verificar un video específico
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="verificationMode" id="allMode" 
+                                       value="all" onchange="toggleVideoSelection()">
+                                <label class="form-check-label" for="allMode">
+                                    Verificar todos mis videos
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3" id="videoSelectionDiv">
+                            <label for="SelectedVideoId" class="form-label">
+                                <i class="bi bi-list-ul me-1"></i>Seleccionar Video
+                            </label>
+                            <select class="form-select" id="SelectedVideoId" asp-for="SelectedVideoId">
+                                <option value="0">-- Seleccione un video --</option>
+                                @foreach (var video in Model.AdminVideos)
+                                {
+                                    <option value="@video.IdVideo">
+                                        @video.TituloVideo (@string.Format("{0:F2}", video.TamañoArchivo / (1024.0 * 1024.0)) MB)
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <input type="hidden" asp-for="CheckAll" id="CheckAllInput" value="false" />
+
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <small>
+                                <strong>¿Qué se verifica?</strong><br />
+                                • Existencia del archivo cifrado<br />
+                                • Tamaño del archivo<br />
+                                • Hash SHA-256 del contenido<br />
+                                • Metadatos de cifrado
+                            </small>
+                        </div>
+
+                        <button type="submit" class="btn btn-info w-100" id="checkButton">
+                            <i class="bi bi-shield-check me-1"></i>Iniciar Verificación
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Estadísticas de Videos -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-body">
+                    <h6 class="text-muted mb-3">Información</h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="bi bi-collection-play me-1"></i>Total de Videos:</span>
+                        <span class="badge bg-primary">@Model.AdminVideos.Count</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="bi bi-hdd me-1"></i>Almacenamiento:</span>
+                        <span class="badge bg-info">
+                            @($"{Model.AdminVideos.Sum(v => v.TamañoArchivo) / (1024.0 * 1024.0):F2} MB")
+                        </span>
+                    </div>
+                    @if (Model.CheckResults.Any())
+                    {
+                        <hr />
+                        <div class="d-flex justify-content-between mb-2">
+                            <span><i class="bi bi-check-circle me-1"></i>Verificados:</span>
+                            <span class="badge bg-success">@Model.CheckResults.Count(r => r.IsValid)</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span><i class="bi bi-x-circle me-1"></i>Con Problemas:</span>
+                            <span class="badge bg-danger">@Model.CheckResults.Count(r => !r.IsValid)</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de Resultados -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clipboard-data me-2"></i>Resultados de Verificación
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.CheckResults.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col" style="width: 5%">#</th>
+                                        <th scope="col" style="width: 30%">Video</th>
+                                        <th scope="col" style="width: 15%" class="text-center">Estado</th>
+                                        <th scope="col" style="width: 15%" class="text-center">Tamaño</th>
+                                        <th scope="col" style="width: 35%">Detalles</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 0; i < Model.CheckResults.Count; i++)
+                                    {
+                                        var result = Model.CheckResults[i];
+                                        <tr class="@(result.IsValid ? "" : "table-danger")">
+                                            <th scope="row">@(i + 1)</th>
+                                            <td>
+                                                <div class="fw-semibold">@result.VideoTitle</div>
+                                                <small class="text-muted">ID: @result.VideoId</small>
+                                            </td>
+                                            <td class="text-center">
+                                                @if (result.IsValid)
+                                                {
+                                                    <span class="badge bg-success">
+                                                        <i class="bi bi-check-circle-fill me-1"></i>Íntegro
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">
+                                                        <i class="bi bi-x-circle-fill me-1"></i>Corrupto
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                @if (result.FileExists)
+                                                {
+                                                    <span class="badge bg-light text-dark">
+                                                        @($"{result.FileSizeBytes / (1024.0 * 1024.0):F2} MB")
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-warning">N/A</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <small>
+                                                    @if (result.FileExists)
+                                                    {
+                                                        <div class="mb-1">
+                                                            <i class="bi bi-file-check text-success me-1"></i>
+                                                            <span>Archivo existe</span>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="mb-1">
+                                                            <i class="bi bi-file-x text-danger me-1"></i>
+                                                            <span>Archivo no encontrado</span>
+                                                        </div>
+                                                    }
+
+                                                    @if (result.HasMetadata)
+                                                    {
+                                                        <div class="mb-1">
+                                                            <i class="bi bi-info-circle text-info me-1"></i>
+                                                            <span>Metadatos presentes</span>
+                                                        </div>
+                                                    }
+
+                                                    @if (!string.IsNullOrEmpty(result.FileHash))
+                                                    {
+                                                        <div class="mb-1">
+                                                            <i class="bi bi-hash text-primary me-1"></i>
+                                                            <span class="text-truncate d-inline-block" style="max-width: 200px;" 
+                                                                  title="@result.FileHash">
+                                                                Hash: @result.FileHash.Substring(0, Math.Min(16, result.FileHash.Length))...
+                                                            </span>
+                                                        </div>
+                                                    }
+
+                                                    <div class="text-muted fst-italic mt-2">
+                                                        @result.ErrorMessage
+                                                    </div>
+                                                </small>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="card-footer bg-light">
+                            <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                Última verificación: @(Model.CheckResults.Any() ? Model.CheckResults.First().CheckDate.ToString("dd/MM/yyyy HH:mm:ss") : "N/A")
+                            </small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-shield-plus display-1 text-muted"></i>
+                            <h5 class="mt-3 text-muted">Sin verificaciones realizadas</h5>
+                            <p class="text-muted">Selecciona un video o verifica todos para ver los resultados</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (Model.CheckResults.Any(r => !r.IsValid))
+            {
+                <div class="alert alert-warning mt-3">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Acciones Recomendadas
+                    </h6>
+                    <ul class="mb-0">
+                        <li>Verifica que no se hayan modificado los archivos de video manualmente</li>
+                        <li>Revisa los permisos de acceso al directorio de almacenamiento</li>
+                        <li>Considera restaurar desde un backup si el archivo está corrupto</li>
+                        <li>Contacta al soporte técnico si el problema persiste</li>
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function toggleVideoSelection() {
+            const singleMode = document.getElementById('singleMode').checked;
+            const videoSelectionDiv = document.getElementById('videoSelectionDiv');
+            const checkAllInput = document.getElementById('CheckAllInput');
+            const selectedVideoInput = document.getElementById('SelectedVideoId');
+            
+            if (singleMode) {
+                videoSelectionDiv.style.display = 'block';
+                checkAllInput.value = 'false';
+                selectedVideoInput.required = true;
+            } else {
+                videoSelectionDiv.style.display = 'none';
+                checkAllInput.value = 'true';
+                selectedVideoInput.required = false;
+                selectedVideoInput.value = '0';
+            }
+        }
+
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleVideoSelection();
+        });
+    </script>
+}
