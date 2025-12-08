@@ -271,9 +271,9 @@ Consulta `OTORGAR_PERMISOS_SQL.md` para configurar permisos correctamente.
 
 ## 10. 📝 Licencia y Créditos
 
-**Proyecto Académico** - Universidad [Nombre]  
-**Materia**: Criptografía Aplicada  
-**Semestre**: Otoño 2025  
+**Proyecto Académico** - ESCOM IPN 
+**Materia**: Selected Topics in Cryptography
+**Semestre**: August 2025 - December 2025  
 
 **Tecnologías Clave**:
 - .NET 8.0, Entity Framework Core
