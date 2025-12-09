@@ -5,6 +5,7 @@
  */
 
 // Elementos del DOM
+await sodium.ready;
 let videoPlayer, loadingOverlay, errorOverlay, loadingStatus, loadingDetails, errorMessage;
 let decryptionStatus;
 let stepIcons = {};

@@ -1,0 +1,226 @@
+@page
+@model SecureVideoStreaming.API.Pages.VideoPlayerModel
+@{
+    ViewData["Title"] = "Reproductor E2E - ChaCha20";
+}
+
+@section Styles {
+    <link rel="modulepreload" href="https://cdn.skypack.dev/@@stablelib/chacha20poly1305">
+}
+
+@Html.AntiForgeryToken()
+
+<div class="container-fluid py-4">
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage) || !Model.HasAccess)
+    {
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="alert alert-danger" role="alert">
+                    <i class="bi bi-lock-fill fs-1 d-block text-center mb-3"></i>
+                    <h4 class="alert-heading text-center">Acceso Denegado</h4>
+                    <p class="text-center mb-3">@(Model.ErrorMessage ?? "No tienes permiso para ver este video")</p>
+                    <hr>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="/VideoGrid" class="btn btn-primary">
+                            <i class="bi bi-grid-3x3-gap me-1"></i>Volver al Catálogo
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else if (Model.Video != null)
+    {
+        <div class="row mb-3">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/Home">Home</a></li>
+                        <li class="breadcrumb-item"><a href="/VideoGrid">Videos</a></li>
+                        <li class="breadcrumb-item active">@Model.Video.TituloVideo (E2E)</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-shield-lock-fill me-2"></i>
+                            Reproducción E2E con ChaCha20-Poly1305
+                        </h5>
+                        <span class="badge bg-light text-success">Zero-Knowledge</span>
+                    </div>
+                    <div class="card-body p-0 position-relative">
+                        <!-- Loading Overlay -->
+                        <div id="loadingOverlay" class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center bg-dark bg-opacity-75" style="z-index: 10;">
+                            <div class="text-center text-white">
+                                <div class="spinner-border mb-3" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <h5 id="loadingStatus">Iniciando descifrado E2E...</h5>
+                                <p id="loadingDetails" class="mb-0">Preparando claves efímeras...</p>
+                                <div class="progress mt-3" style="width: 300px; height: 8px;">
+                                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Error Overlay -->
+                        <div id="errorOverlay" class="position-absolute w-100 h-100 d-none align-items-center justify-content-center bg-danger bg-opacity-75" style="z-index: 11;">
+                            <div class="text-center text-white px-4">
+                                <i class="bi bi-exclamation-triangle fs-1 mb-3"></i>
+                                <h5>Error al Descifrar Video</h5>
+                                <p id="errorMessage">Ha ocurrido un error inesperado</p>
+                                <button class="btn btn-light" onclick="location.reload()">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Reintentar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Video Player -->
+                        <video id="videoPlayer" class="w-100" controls style="max-height: 600px; background: #000;">
+                            Tu navegador no soporta el elemento de video.
+                        </video>
+                    </div>
+                </div>
+
+                <!-- Comparación de Modos -->
+                <div class="card shadow-sm mt-3">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="bi bi-info-circle me-2"></i>Modo de Reproducción
+                        </h6>
+                        <p class="mb-2">
+                            <strong class="text-success">Modo actual: End-to-End (ChaCha20-Poly1305)</strong>
+                        </p>
+                        <ul class="mb-3" style="font-size: 0.9rem;">
+                            <li>✅ El servidor <strong>NUNCA</strong> ve el video descifrado</li>
+                            <li>✅ Descifrado 100% en tu navegador</li>
+                            <li>✅ Claves RSA efímeras (se destruyen después)</li>
+                            <li>✅ Compatible con ChaCha20-Poly1305 del backend</li>
+                        </ul>
+                        <a href="/VideoPlayer?id=@Model.Video.IdVideo" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-server me-1"></i>Cambiar a Server-Side
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información del Video -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-info-circle me-2"></i>Información
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="mb-3">@Model.Video.TituloVideo</h6>
+                        
+                        @if (!string.IsNullOrEmpty(Model.Video.Descripcion))
+                        {
+                            <p class="text-muted mb-3">@Model.Video.Descripcion</p>
+                        }
+
+                        <ul class="list-unstyled mb-0">
+                            <li class="mb-2">
+                                <i class="bi bi-calendar3 text-muted me-2"></i>
+                                <small>Subido: @Model.Video.FechaSubida.ToString("dd/MM/yyyy HH:mm")</small>
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-file-earmark-play text-muted me-2"></i>
+                                <small>Formato: @(Model.Video.FormatoVideo?.ToUpper() ?? "MP4")</small>
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-hdd text-muted me-2"></i>
+                                <small>Cifrado con E2E</small>
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-shield-check text-success me-2"></i>
+                                <small><strong>ChaCha20-Poly1305</strong></small>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Pasos E2E -->
+                <div class="card shadow-sm">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-list-check me-2"></i>Proceso E2E
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <ol class="mb-0" style="font-size: 0.85rem; padding-left: 1.2rem;">
+                            <li>Generar claves RSA efímeras</li>
+                            <li>Enviar clave pública al servidor</li>
+                            <li>Recibir video cifrado + KEK cifrada</li>
+                            <li>Descifrar KEK con clave privada</li>
+                            <li>Descifrar video con ChaCha20-Poly1305</li>
+                            <li>Reproducir video en navegador</li>
+                            <li>Destruir claves efímeras</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <!-- Precargar librería ChaCha20-Poly1305 desde CDN (Skypack) -->
+    <link rel="modulepreload" href="https://cdn.skypack.dev/@@stablelib/chacha20poly1305">
+    <link rel="modulepreload" href="https://cdn.skypack.dev/@@stablelib/random">
+    
+    <script type="module">
+        // Importar clase E2E desde archivo local (que a su vez importa desde CDN)
+        import { E2EVideoPlayerChaCha20 } from '/js/video-decryption-e2e-chacha20.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const videoId = @(Model.Video?.IdVideo ?? 0);
+            const userId = @Model.UserId;
+
+            const player = new E2EVideoPlayerChaCha20(videoId, userId);
+            const videoElement = document.getElementById('videoPlayer');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const errorOverlay = document.getElementById('errorOverlay');
+            const loadingStatus = document.getElementById('loadingStatus');
+            const loadingDetails = document.getElementById('loadingDetails');
+            const errorMessage = document.getElementById('errorMessage');
+            const progressBar = document.getElementById('progressBar');
+
+            player.setVideoElement(videoElement);
+
+            // Callback de progreso
+            player.onProgress((message, percent) => {
+                loadingStatus.textContent = message;
+                progressBar.style.width = `${percent}%`;
+                
+                if (percent >= 100) {
+                    setTimeout(() => {
+                        loadingOverlay.style.display = 'none';
+                    }, 500);
+                }
+            });
+
+            try {
+                await player.loadAndDecryptVideo();
+                console.log('✓ Video E2E cargado exitosamente');
+            } catch (error) {
+                console.error('Error al cargar video E2E:', error);
+                errorMessage.textContent = error.message || 'Error desconocido';
+                loadingOverlay.style.display = 'none';
+                errorOverlay.classList.remove('d-none');
+                errorOverlay.classList.add('d-flex');
+            }
+
+            // Cleanup al salir
+            window.addEventListener('beforeunload', () => {
+                player.cleanup();
+            });
+        });
+    </script>
+}

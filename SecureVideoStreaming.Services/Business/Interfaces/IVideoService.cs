@@ -14,5 +14,11 @@ namespace SecureVideoStreaming.Services.Business.Interfaces
         Task<ApiResponse<VideoResponse>> UpdateVideoMetadataAsync(int videoId, UpdateVideoMetadataRequest request, int adminId);
         Task<ApiResponse<EncryptedVideoDataResponse>> GetEncryptedVideoDataAsync(int videoId);
         Task<DecryptedVideoStreamResponse> GetDecryptedVideoStreamAsync(int videoId, int userId);
+        
+        /// <summary>
+        /// Obtiene video cifrado + KEK cifrada para descifrado E2E en cliente
+        /// Compatible con @stablelib/chacha20poly1305
+        /// </summary>
+        Task<ApiResponse<E2EVideoDataResponse>> GetEncryptedVideoForClientAsync(int videoId, int userId, string clientPublicKeyBase64);
     }
 }

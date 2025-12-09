@@ -150,6 +150,34 @@ namespace SecureVideoStreaming.Services.Cryptography.Implementations
             }
         }
 
+        /// <summary>
+        /// Cifra datos con clave pública RSA en formato SPKI bytes (para Web Crypto API)
+        /// </summary>
+        public byte[] EncryptWithPublicKeyBytes(byte[] data, byte[] publicKeyBytes)
+        {
+            if (data == null || data.Length == 0)
+                throw new ArgumentException("Los datos no pueden estar vacíos", nameof(data));
+
+            if (publicKeyBytes == null || publicKeyBytes.Length == 0)
+                throw new ArgumentException("La clave pública no puede estar vacía", nameof(publicKeyBytes));
+
+            try
+            {
+                // Importar clave pública desde bytes SPKI (SubjectPublicKeyInfo)
+                AsymmetricKeyParameter publicKey = PublicKeyFactory.CreateKey(publicKeyBytes);
+
+                // Cifrar con OAEP (SHA-256)
+                var engine = new OaepEncoding(new RsaEngine(), new Org.BouncyCastle.Crypto.Digests.Sha256Digest());
+                engine.Init(true, publicKey);
+
+                return engine.ProcessBlock(data, 0, data.Length);
+            }
+            catch (Exception ex)
+            {
+                throw new CryptographicException($"Error al cifrar con RSA usando clave pública en bytes: {ex.Message}", ex);
+            }
+        }
+
         public bool VerifySignature(byte[] data, byte[] signature, string publicKeyPem)
         {
             if (data == null || data.Length == 0)

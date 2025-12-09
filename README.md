@@ -2,7 +2,7 @@
 
 ## 🎯 Proyecto de Criptografía Aplicada
 
-### 📅 Última Actualización: 8 de Diciembre de 2025
+### 📅 Última Actualización: Diciembre 2025
 ### 👥 Autores
 - **García García Aram Jesua**
 - **Hernández Díaz Roberto Angel**

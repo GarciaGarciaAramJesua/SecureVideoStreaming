@@ -690,5 +690,93 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                 throw new InvalidOperationException($"Error al desencriptar el video: {ex.Message}", ex);
             }
         }
+
+        /// <summary>
+        /// Obtiene video cifrado + KEK cifrada para descifrado E2E en cliente
+        /// Compatible con @stablelib/chacha20poly1305
+        /// </summary>
+        public async Task<ApiResponse<E2EVideoDataResponse>> GetEncryptedVideoForClientAsync(
+            int videoId, 
+            int userId, 
+            string clientPublicKeyBase64)
+        {
+            try
+            {
+                // 1. Verificar que el video existe
+                var video = await _context.Videos
+                    .Include(v => v.DatosCriptograficos)
+                    .FirstOrDefaultAsync(v => v.IdVideo == videoId);
+
+                if (video == null)
+                {
+                    return ApiResponse<E2EVideoDataResponse>.ErrorResponse("Video no encontrado");
+                }
+
+                // 2. Verificar que el usuario tiene acceso
+                // Un permiso está activo si:
+                // - TipoPermiso es "Lectura" (no está "Revocado")
+                // - No ha expirado (FechaExpiracion es null o en el futuro)
+                // - No ha alcanzado el máximo de accesos (MaxAccesos es null o NumeroAccesos < MaxAccesos)
+                var now = DateTime.UtcNow;
+                var hasAccess = await _context.Permisos
+                    .AnyAsync(p => p.IdVideo == videoId 
+                        && p.IdUsuario == userId 
+                        && p.TipoPermiso == "Lectura"
+                        && (p.FechaExpiracion == null || p.FechaExpiracion > now)
+                        && (p.MaxAccesos == null || p.NumeroAccesos < p.MaxAccesos));
+
+                if (!hasAccess)
+                {
+                    return ApiResponse<E2EVideoDataResponse>.ErrorResponse("No tienes permiso para acceder a este video");
+                }
+
+                // 3. Obtener datos criptográficos
+                var cryptoData = video.DatosCriptograficos;
+                if (cryptoData == null)
+                {
+                    return ApiResponse<E2EVideoDataResponse>.ErrorResponse("Datos criptográficos no encontrados");
+                }
+
+                // 4. Leer el video cifrado desde el disco
+                var encryptedFilePath = Path.IsPathRooted(video.RutaAlmacenamiento)
+                    ? video.RutaAlmacenamiento
+                    : Path.Combine(_videosPath, video.RutaAlmacenamiento);
+
+                if (!File.Exists(encryptedFilePath))
+                {
+                    return ApiResponse<E2EVideoDataResponse>.ErrorResponse("Archivo de video no encontrado");
+                }
+
+                var encryptedVideoBytes = await File.ReadAllBytesAsync(encryptedFilePath);
+
+                // 5. Descifrar la KEK con la clave privada del servidor
+                var serverPrivateKey = _keyManagementService.GetServerPrivateKey();
+                byte[] kek = _rsaService.Decrypt(cryptoData.KEKCifrada, serverPrivateKey);
+
+                // 6. CRÍTICO: Re-cifrar la KEK con la clave pública del cliente (SPKI Base64)
+                byte[] clientPublicKeyBytes = Convert.FromBase64String(clientPublicKeyBase64);
+                byte[] encryptedKEKForClient = _rsaService.EncryptWithPublicKeyBytes(kek, clientPublicKeyBytes);
+
+                // 7. Construir respuesta E2E
+                var response = new E2EVideoDataResponse
+                {
+                    EncryptedVideo = Convert.ToBase64String(encryptedVideoBytes),
+                    EncryptedKEK = Convert.ToBase64String(encryptedKEKForClient),
+                    Nonce = Convert.ToBase64String(cryptoData.Nonce),
+                    AuthTag = Convert.ToBase64String(cryptoData.AuthTag),
+                    OriginalSize = video.TamañoArchivo,
+                    Format = video.FormatoVideo ?? "mp4"
+                };
+
+                // 8. Limpiar KEK de memoria
+                Array.Clear(kek, 0, kek.Length);
+
+                return ApiResponse<E2EVideoDataResponse>.SuccessResponse(response, "Video cifrado obtenido para E2E");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<E2EVideoDataResponse>.ErrorResponse($"Error al obtener video E2E: {ex.Message}");
+            }
+        }
     }
 }

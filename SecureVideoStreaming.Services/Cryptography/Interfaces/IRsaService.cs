@@ -26,6 +26,14 @@ namespace SecureVideoStreaming.Services.Cryptography.Interfaces
         byte[] Decrypt(byte[] encryptedData, string privateKeyPem);
 
         /// <summary>
+        /// Cifra datos con clave pública RSA en formato SPKI bytes (para Web Crypto API)
+        /// </summary>
+        /// <param name="data">Datos a cifrar</param>
+        /// <param name="publicKeyBytes">Clave pública en formato SPKI (SubjectPublicKeyInfo)</param>
+        /// <returns>Datos cifrados</returns>
+        byte[] EncryptWithPublicKeyBytes(byte[] data, byte[] publicKeyBytes);
+
+        /// <summary>
         /// Firma datos con la clave privada RSA
         /// </summary>
         byte[] Sign(byte[] data, string privateKeyPem);

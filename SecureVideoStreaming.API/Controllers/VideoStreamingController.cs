@@ -71,7 +71,6 @@ public class VideoStreamingController : ControllerBase
             return Ok(ApiResponse<object>.ErrorResponse("Error al obtener el video cifrado"));
         }
     }
-
     /// <summary>
     /// Registra un acceso a un video
     /// </summary>

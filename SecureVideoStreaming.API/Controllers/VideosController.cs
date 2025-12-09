@@ -277,6 +277,51 @@ namespace SecureVideoStreaming.API.Controllers
         }
 
         /// <summary>
+        /// Stream E2E: Video cifrado + KEK cifrada para descifrado en cliente con @stablelib/chacha20poly1305
+        /// El servidor NO descifra el video, solo cifra el KEK con la clave pública del cliente
+        /// </summary>
+        [HttpPost("{id}/stream-e2e")]
+        public async Task<IActionResult> StreamEncryptedVideoE2E(int id, [FromBody] ClientPublicKeyRequest request)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+                {
+                    return Unauthorized(new { message = "Token inválido" });
+                }
+
+                if (string.IsNullOrWhiteSpace(request.ClientPublicKey))
+                {
+                    return BadRequest(new { message = "Se requiere clave pública del cliente" });
+                }
+
+                // Obtener video cifrado + KEK cifrada para el cliente
+                var result = await _videoService.GetEncryptedVideoForClientAsync(id, userId, request.ClientPublicKey);
+                
+                if (!result.Success || result.Data == null)
+                {
+                    return NotFound(new { message = result.Message ?? "Video no encontrado" });
+                }
+
+                return Ok(result.Data);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener video E2E {VideoId}", id);
+                return StatusCode(500, new { message = "Error al obtener video cifrado" });
+            }
+        }
+
+        /// <summary>
         /// Stream de video descifrado (servidor descifra y envía)
         /// </summary>
         [HttpGet("{id}/stream")]
