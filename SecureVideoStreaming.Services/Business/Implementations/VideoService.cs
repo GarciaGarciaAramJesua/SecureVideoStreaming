@@ -494,8 +494,11 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                     return ApiResponse<EncryptedVideoDataResponse>.ErrorResponse("Archivo de video no encontrado");
                 }
 
-                // 3. Leer datos del archivo cifrado
-                var encryptedBytes = await File.ReadAllBytesAsync(encryptedFilePath);
+                // 3. Leer datos del archivo cifrado (en Base64)
+                var encryptedBase64 = await File.ReadAllTextAsync(encryptedFilePath);
+                var encryptedBytes = Convert.FromBase64String(encryptedBase64);
+                
+                Console.WriteLine($"[VideoService] Video cifrado leído desde Base64 ({encryptedBytes.Length} bytes)");
 
                 // 4. Leer nonce y auth tag del archivo metadata
                 var metadataPath = encryptedFilePath + ".metadata";
@@ -656,8 +659,11 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                     throw new FileNotFoundException($"Archivo cifrado no encontrado: {encryptedFilePath}");
                 }
 
-                // 6. Leer el video cifrado
-                var encryptedBytes = await File.ReadAllBytesAsync(encryptedFilePath);
+                // 6. Leer el video cifrado (desde Base64)
+                var encryptedBase64 = await File.ReadAllTextAsync(encryptedFilePath);
+                var encryptedBytes = Convert.FromBase64String(encryptedBase64);
+                
+                Console.WriteLine($"[VideoService] Video cifrado leído desde Base64 para descifrado ({encryptedBytes.Length} bytes)");
 
                 // 7. Obtener la clave privada del servidor para descifrar la KEK
                 var serverPrivateKey = _keyManagementService.GetServerPrivateKey();
@@ -747,7 +753,10 @@ namespace SecureVideoStreaming.Services.Business.Implementations
                     return ApiResponse<E2EVideoDataResponse>.ErrorResponse("Archivo de video no encontrado");
                 }
 
-                var encryptedVideoBytes = await File.ReadAllBytesAsync(encryptedFilePath);
+                var encryptedVideoBase64 = await File.ReadAllTextAsync(encryptedFilePath);
+                var encryptedVideoBytes = Convert.FromBase64String(encryptedVideoBase64);
+                
+                Console.WriteLine($"[VideoService E2E] Video cifrado leído desde Base64 ({encryptedVideoBytes.Length} bytes)");
 
                 // 5. Descifrar la KEK con la clave privada del servidor
                 var serverPrivateKey = _keyManagementService.GetServerPrivateKey();

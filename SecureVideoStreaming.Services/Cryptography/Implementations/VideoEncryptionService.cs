@@ -60,7 +60,6 @@ namespace SecureVideoStreaming.Services.Cryptography.Implementations
             long encryptedSize;
 
             using (var inputStream = File.OpenRead(inputFilePath))
-            using (var outputStream = File.Create(outputFilePath))
             {
                 // Leer todo el archivo en memoria para cifrado
                 // Nota: Para archivos muy grandes, se debería implementar cifrado por bloques
@@ -78,9 +77,12 @@ namespace SecureVideoStreaming.Services.Cryptography.Implementations
                 nonce = nonceGenerated;
                 authTag = authTagGenerated;
 
-                // Escribir datos cifrados
-                await outputStream.WriteAsync(ciphertext, 0, ciphertext.Length);
+                // Convertir datos cifrados a Base64 y guardar
+                var ciphertextBase64 = Convert.ToBase64String(ciphertext);
+                await File.WriteAllTextAsync(outputFilePath, ciphertextBase64);
                 encryptedSize = ciphertext.Length;
+                
+                Console.WriteLine($"[VideoEncryptionService] Video cifrado guardado en Base64 ({ciphertextBase64.Length} caracteres)");
             }
 
             // 5. Calcular HMAC del video cifrado con clave del administrador
@@ -136,12 +138,13 @@ namespace SecureVideoStreaming.Services.Cryptography.Implementations
                 throw new ArgumentException("El authTag debe tener 16 bytes", nameof(authTag));
             }
 
-            using (var inputStream = File.OpenRead(encryptedFilePath))
             using (var outputStream = File.Create(outputFilePath))
             {
-                // Leer datos cifrados
-                var encryptedData = new byte[inputStream.Length];
-                await inputStream.ReadAsync(encryptedData, 0, encryptedData.Length);
+                // Leer datos cifrados desde Base64
+                var encryptedBase64 = await File.ReadAllTextAsync(encryptedFilePath);
+                var encryptedData = Convert.FromBase64String(encryptedBase64);
+                
+                Console.WriteLine($"[VideoEncryptionService] Video leído desde Base64 ({encryptedData.Length} bytes)");
 
                 // Descifrar con ChaCha20-Poly1305
                 var plaintext = _chaChaService.Decrypt(
@@ -177,9 +180,13 @@ namespace SecureVideoStreaming.Services.Cryptography.Implementations
                 throw new ArgumentException("La clave HMAC no puede estar vacía", nameof(hmacKey));
             }
 
-            using (var fileStream = File.OpenRead(encryptedFilePath))
+            // Leer archivo cifrado desde Base64 y calcular HMAC sobre los bytes
+            var encryptedBase64 = File.ReadAllText(encryptedFilePath);
+            var encryptedBytes = Convert.FromBase64String(encryptedBase64);
+            
+            using (var memoryStream = new MemoryStream(encryptedBytes))
             {
-                var computedHmac = _hmacService.ComputeHmac(fileStream, hmacKey);
+                var computedHmac = _hmacService.ComputeHmac(memoryStream, hmacKey);
                 return CryptographicOperations.FixedTimeEquals(computedHmac, expectedHmac);
             }
         }
